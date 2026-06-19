@@ -26,43 +26,41 @@ function getInitial(name: string): string {
   return name.charAt(0).toUpperCase();
 }
 
-function priceLabel(range: number): string {
-  return Array(range).fill('₺').join('');
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const months = [
+    'Oca', 'Sub', 'Mar', 'Nis', 'May', 'Haz',
+    'Tem', 'Agu', 'Eyl', 'Eki', 'Kas', 'Ara',
+  ];
+  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-/* ── Venue Card ───────────────────────────────────── */
+/* ── Venue Row ────────────────────────────────────── */
 
-function VenueCard({ venue }: { venue: Venue }) {
-  const vibeChips = venue.vibe.slice(0, 3);
+function VenueRow({ venue, isLast }: { venue: Venue; isLast: boolean }) {
+  const vibeChips = venue.vibe.slice(0, 2);
 
   return (
-    <View style={styles.venueCard}>
-      {/* Left: image placeholder */}
+    <View style={[styles.venueRow, !isLast && styles.venueRowBorder]}>
       <View style={styles.venueImage}>
         <Text style={styles.venueImageInitial}>{getInitial(venue.name)}</Text>
       </View>
 
-      {/* Right: info */}
       <View style={styles.venueInfo}>
         <Text style={styles.venueName} numberOfLines={1}>
           {venue.name}
         </Text>
         <Text style={styles.venueNeighborhood}>{venue.neighborhood}</Text>
 
-        <View style={styles.vibeRow}>
-          {vibeChips.map((vibe) => (
-            <View key={vibe} style={styles.vibeChip}>
-              <Text style={styles.vibeChipText}>{vibe}</Text>
-            </View>
-          ))}
-        </View>
-
-        <Text style={styles.venuePrice}>{priceLabel(venue.priceRange)}</Text>
-      </View>
-
-      {/* Delete hint */}
-      <View style={styles.deleteHint}>
-        <Text style={styles.deleteHintIcon}>x</Text>
+        {vibeChips.length > 0 && (
+          <View style={styles.vibeRow}>
+            {vibeChips.map((vibe) => (
+              <View key={vibe} style={styles.vibeChip}>
+                <Text style={styles.vibeChipText}>{vibe}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -73,10 +71,9 @@ function VenueCard({ venue }: { venue: Venue }) {
 function EmptyState() {
   return (
     <View style={styles.emptyState}>
-      <View style={styles.emptyIllustration}>
-        <Text style={styles.emptyIllustrationText}>[ ]</Text>
-      </View>
+      <Text style={styles.emptySymbol}>{'◇'}</Text>
       <Text style={styles.emptyText}>Bu listede henuz mekan yok</Text>
+      <Text style={styles.emptyHint}>Kesfet'ten mekan ekle</Text>
     </View>
   );
 }
@@ -104,12 +101,12 @@ export default function ListDetailScreen() {
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
-            style={styles.backButton}
+            style={styles.headerCircle}
           >
-            <Text style={styles.backText}>{'<'}</Text>
+            <Text style={styles.headerCircleIcon}>{'←'}</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Liste bulunamadi</Text>
-          <View style={styles.headerSpacer} />
+          <View style={styles.headerCircleSpacer} />
         </View>
       </View>
     );
@@ -122,40 +119,38 @@ export default function ListDetailScreen() {
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
-          style={styles.backButton}
+          style={styles.headerCircle}
         >
-          <Text style={styles.backText}>{'<'}</Text>
+          <Text style={styles.headerCircleIcon}>{'←'}</Text>
         </TouchableOpacity>
+
         <Text style={styles.headerTitle} numberOfLines={1}>
           {list.name}
         </Text>
-        <View style={styles.headerSpacer} />
+
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.headerCircle}
+        >
+          <Text style={styles.headerCircleIcon}>{'↗'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Info Bar */}
+      <View style={styles.infoBar}>
+        <Text style={styles.infoText}>{venues.length} mekan</Text>
+        <Text style={styles.infoDot}>{'·'}</Text>
+        <Text style={styles.infoText}>
+          {list.isPublic ? 'Herkese acik' : 'Gizli'}
+        </Text>
+        <Text style={styles.infoDot}>{'·'}</Text>
+        <Text style={styles.infoText}>{formatDate(list.createdAt)}</Text>
       </View>
 
       {/* Description */}
       {list.description ? (
         <Text style={styles.description}>{list.description}</Text>
       ) : null}
-
-      {/* Info Row */}
-      <View style={styles.infoRow}>
-        <Text style={styles.infoText}>{venues.length} mekan</Text>
-        <View style={styles.dot} />
-        <View
-          style={[
-            styles.visibilityBadge,
-            list.isPublic ? styles.publicBadge : styles.privateBadge,
-          ]}
-        >
-          <Text style={styles.visibilityBadgeText}>
-            {list.isPublic ? 'Herkese acik' : 'Gizli'}
-          </Text>
-        </View>
-        <View style={{ flex: 1 }} />
-        <TouchableOpacity activeOpacity={0.7} style={styles.shareButton}>
-          <Text style={styles.shareButtonText}>Paylas</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Venue List */}
       {venues.length === 0 ? (
@@ -164,10 +159,11 @@ export default function ListDetailScreen() {
         <FlatList
           data={venues}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <VenueCard venue={item} />}
+          renderItem={({ item, index }) => (
+            <VenueRow venue={item} isLast={index === venues.length - 1} />
+          )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: theme.spacing[3] }} />}
         />
       )}
     </View>
@@ -186,24 +182,24 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: theme.spacing[4],
     paddingVertical: theme.spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.hairline,
   },
-  backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
+  headerCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.mist,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing[3],
   },
-  backText: {
-    fontSize: theme.typography.sizes.md,
-    fontWeight: theme.typography.weights.semibold,
+  headerCircleSpacer: {
+    width: 40,
+    height: 40,
+  },
+  headerCircleIcon: {
+    fontSize: theme.typography.sizes.lg,
     color: theme.colors.graphite,
   },
   headerTitle: {
@@ -211,9 +207,28 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.sizes.lg,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
+    textAlign: 'center',
+    marginHorizontal: theme.spacing[3],
   },
-  headerSpacer: {
-    width: 32,
+
+  /* Info Bar */
+  infoBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing[4],
+    paddingTop: theme.spacing[1],
+    paddingBottom: theme.spacing[3],
+    gap: theme.spacing[2],
+  },
+  infoText: {
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: theme.typography.weights.regular,
+    color: theme.colors.concrete,
+  },
+  infoDot: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.ash,
   },
 
   /* Description */
@@ -222,145 +237,69 @@ const styles = StyleSheet.create({
     fontWeight: theme.typography.weights.regular,
     color: theme.colors.concrete,
     paddingHorizontal: theme.spacing[4],
-    paddingTop: theme.spacing[4],
-  },
-
-  /* Info Row */
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[3],
-    gap: theme.spacing[2],
-  },
-  infoText: {
-    fontSize: theme.typography.sizes.sm,
-    fontWeight: theme.typography.weights.regular,
-    color: theme.colors.concrete,
-  },
-  dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: theme.colors.ash,
-  },
-  visibilityBadge: {
-    paddingHorizontal: theme.spacing[3],
-    paddingVertical: 4,
-    borderRadius: theme.radius.pills,
-    borderWidth: 1,
-  },
-  publicBadge: {
-    borderColor: theme.colors.hairline,
-    backgroundColor: theme.colors.mist,
-  },
-  privateBadge: {
-    borderColor: theme.colors.hairline,
-    backgroundColor: theme.colors.mist,
-  },
-  visibilityBadgeText: {
-    fontSize: theme.typography.sizes.xs,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.concrete,
-  },
-  shareButton: {
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[2],
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
-  },
-  shareButtonText: {
-    fontSize: theme.typography.sizes.sm,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.graphite,
+    paddingBottom: theme.spacing[4],
+    textAlign: 'center',
   },
 
   /* Venue List */
   listContent: {
     paddingHorizontal: theme.spacing[4],
-    paddingTop: theme.spacing[3],
     paddingBottom: theme.spacing[10],
   },
 
-  /* Venue Card */
-  venueCard: {
+  /* Venue Row */
+  venueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing[3],
-    gap: theme.spacing[3],
+    paddingVertical: theme.spacing[4],
+    gap: theme.spacing[4],
+  },
+  venueRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.hairline,
   },
   venueImage: {
-    width: 80,
-    height: 80,
+    width: 64,
+    height: 64,
     borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.mist,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
     alignItems: 'center',
     justifyContent: 'center',
   },
   venueImageInitial: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.concrete,
+    fontSize: 22,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.ash,
   },
   venueInfo: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
   venueName: {
-    fontSize: theme.typography.sizes.md,
+    fontSize: 15,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
   },
   venueNeighborhood: {
-    fontSize: theme.typography.sizes.sm,
+    fontSize: theme.typography.sizes.xs,
     fontWeight: theme.typography.weights.regular,
     color: theme.colors.concrete,
   },
   vibeRow: {
     flexDirection: 'row',
-    gap: theme.spacing[1],
-    marginTop: 2,
+    gap: theme.spacing['1.5'],
+    marginTop: 4,
   },
   vibeChip: {
     paddingHorizontal: theme.spacing[2],
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: theme.radius.pills,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
     backgroundColor: theme.colors.mist,
   },
   vibeChipText: {
     fontSize: 11,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.concrete,
-  },
-  venuePrice: {
-    fontSize: theme.typography.sizes.sm,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.graphite,
-    marginTop: 2,
-  },
-
-  /* Delete Hint */
-  deleteHint: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteHintIcon: {
-    fontSize: theme.typography.sizes.xs,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.ash,
   },
 
   /* Empty State */
@@ -369,26 +308,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: theme.spacing[8],
-    gap: theme.spacing[4],
+    gap: theme.spacing[3],
   },
-  emptyIllustration: {
-    width: 120,
-    height: 120,
-    borderRadius: theme.radius.xl,
-    backgroundColor: theme.colors.mist,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyIllustrationText: {
-    fontSize: 32,
+  emptySymbol: {
+    fontSize: 48,
     color: theme.colors.ash,
+    marginBottom: theme.spacing[2],
   },
   emptyText: {
-    fontSize: theme.typography.sizes.base,
-    fontWeight: theme.typography.weights.medium,
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.regular,
     color: theme.colors.concrete,
+    textAlign: 'center',
+  },
+  emptyHint: {
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: theme.typography.weights.regular,
+    color: theme.colors.ash,
     textAlign: 'center',
   },
 });

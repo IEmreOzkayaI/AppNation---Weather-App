@@ -9,12 +9,13 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { theme } from '../theme';
 import { MOCK_VENUES } from '../data/mockData';
 import type { Venue, Comment } from '../types';
 
-/* ── Route typing ─────────────────────────────────── */
+/* -- Route typing ---------------------------------------- */
 
 type VenueDetailRouteProp = RouteProp<
   { VenueDetail: { venueId: string } },
@@ -22,9 +23,9 @@ type VenueDetailRouteProp = RouteProp<
 >;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const IMAGE_HEIGHT = 250;
+const IMAGE_HEIGHT = 300;
 
-/* ── Helpers ──────────────────────────────────────── */
+/* -- Helpers --------------------------------------------- */
 
 const priceSymbols = (range: number): string =>
   Array(range).fill('₺').join('');
@@ -51,50 +52,39 @@ const entryDifficultyLabels: Record<string, string> = {
 };
 
 const crowdLabels: Record<string, string> = {
-  sakin: 'sakin',
-  orta: 'orta',
-  kalabalik: 'kalabali̇k',
+  sakin: 'Sakin',
+  orta: 'Orta',
+  kalabalik: 'Kalabalık',
 };
 
-/* ── Sub-components ───────────────────────────────── */
+/* -- Sub-components -------------------------------------- */
 
-function Divider() {
-  return <View style={styles.divider} />;
+function FullBleedDivider() {
+  return <View style={styles.fullBleedDivider} />;
 }
 
-function Chip({ label, filled }: { label: string; filled?: boolean }) {
+function SectionTitle({ title }: { title: string }) {
   return (
-    <View
-      style={[
-        styles.chip,
-        filled && {
-          backgroundColor: theme.colors.graphite,
-        },
-      ]}
-    >
-      <Text
-        style={[
-          styles.chipText,
-          filled && { color: theme.colors.chalk },
-        ]}
-      >
-        {label}
-      </Text>
+    <View style={styles.sectionTitleRow}>
+      <View style={styles.sectionTitleAccent} />
+      <Text style={styles.sectionTitle}>{title}</Text>
     </View>
   );
 }
 
-function NoiseDots({ level }: { level: number }) {
+function NoiseBars({ level }: { level: number }) {
+  const barHeights = [8, 12, 16, 14, 20];
   return (
-    <View style={styles.dotsRow}>
-      {[1, 2, 3, 4, 5].map((i) => (
+    <View style={styles.noiseBarsRow}>
+      {barHeights.map((h, i) => (
         <View
           key={i}
           style={[
-            styles.dot,
+            styles.noiseBar,
             {
+              height: h,
               backgroundColor:
-                i <= level ? theme.colors.graphite : theme.colors.hairline,
+                i < level ? theme.colors.graphite : theme.colors.hairline,
             },
           ]}
         />
@@ -103,42 +93,71 @@ function NoiseDots({ level }: { level: number }) {
   );
 }
 
-function StarRating({ rating }: { rating: number }) {
+function DotRating({ rating }: { rating: number }) {
   return (
-    <View style={styles.starsRow}>
+    <View style={styles.dotRatingRow}>
       {[1, 2, 3, 4, 5].map((i) => (
         <Text
           key={i}
           style={[
-            styles.star,
+            styles.dotRatingChar,
             {
               color:
                 i <= rating ? theme.colors.graphite : theme.colors.hairline,
             },
           ]}
         >
-          {'★'}
+          {'●'}
         </Text>
       ))}
     </View>
   );
 }
 
-function SectionTitle({ title }: { title: string }) {
-  return <Text style={styles.sectionTitle}>{title}</Text>;
-}
-
-function InfoRow({
+function InfoGridCell({
   label,
-  children,
+  value,
+  showRightBorder,
+  showBottomBorder,
 }: {
   label: string;
-  children: React.ReactNode;
+  value: React.ReactNode;
+  showRightBorder?: boolean;
+  showBottomBorder?: boolean;
 }) {
   return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <View style={styles.infoValue}>{children}</View>
+    <View
+      style={[
+        styles.gridCell,
+        showRightBorder && styles.gridCellRightBorder,
+        showBottomBorder && styles.gridCellBottomBorder,
+      ]}
+    >
+      <Text style={styles.gridCellLabel}>{label}</Text>
+      {typeof value === 'string' ? (
+        <Text style={styles.gridCellValue}>{value}</Text>
+      ) : (
+        <View style={styles.gridCellValueContainer}>{value}</View>
+      )}
+    </View>
+  );
+}
+
+function PracticalInfoRow({
+  icon,
+  text,
+  isLast,
+}: {
+  icon: string;
+  text: string;
+  isLast?: boolean;
+}) {
+  return (
+    <View
+      style={[styles.practicalRow, !isLast && styles.practicalRowBorder]}
+    >
+      <Text style={styles.practicalIcon}>{icon}</Text>
+      <Text style={styles.practicalText}>{text}</Text>
     </View>
   );
 }
@@ -160,12 +179,12 @@ function CommentCard({ comment }: { comment: Comment }) {
         </View>
       </View>
       <Text style={styles.commentText}>{comment.text}</Text>
-      <StarRating rating={comment.vibeRating} />
+      <DotRating rating={comment.vibeRating} />
     </View>
   );
 }
 
-/* ── Main Screen ──────────────────────────────────── */
+/* -- Main Screen ----------------------------------------- */
 
 export default function VenueDetailScreen() {
   const route = useRoute<VenueDetailRouteProp>();
@@ -176,7 +195,6 @@ export default function VenueDetailScreen() {
   const venue = MOCK_VENUES.find((v) => v.id === venueId);
 
   const [saved, setSaved] = useState(false);
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   if (!venue) {
     return (
@@ -186,8 +204,45 @@ export default function VenueDetailScreen() {
     );
   }
 
-  const allImages = [venue.coverImage, ...venue.images];
   const venueInitial = venue.name.charAt(0).toUpperCase();
+
+  /* Build practical info rows */
+  const practicalRows: { icon: string; text: string }[] = [
+    { icon: '→', text: venue.address },
+    { icon: '◷', text: venue.hours },
+  ];
+  if (venue.phone) {
+    practicalRows.push({ icon: '☏', text: venue.phone });
+  }
+  if (venue.website) {
+    practicalRows.push({ icon: '↗', text: venue.website });
+  }
+  practicalRows.push({
+    icon: '◎',
+    text: `Giriş: ${entryDifficultyLabels[venue.entryDifficulty]}`,
+  });
+
+  /* Build vibe grid data (2-column layout) */
+  const gridItems: { label: string; value: React.ReactNode }[] = [
+    { label: 'DRESS CODE', value: venue.dressCode },
+    {
+      label: 'GÜRÜLTÜ',
+      value: <NoiseBars level={venue.noiseLevel} />,
+    },
+    {
+      label: 'HAFTA İÇİ',
+      value: crowdLabels[venue.crowdWeekday],
+    },
+    {
+      label: 'HAFTA SONU',
+      value: crowdLabels[venue.crowdWeekend],
+    },
+    { label: 'FİYAT', value: priceSymbols(venue.priceRange) },
+    {
+      label: 'İDEAL ZAMAN',
+      value: venue.idealTime.map((t) => idealTimeLabels[t] || t).join(', '),
+    },
+  ];
 
   return (
     <View style={styles.root}>
@@ -196,137 +251,121 @@ export default function VenueDetailScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── 1. Visual Content ──────────────────────── */}
-        <View style={styles.imageContainer}>
+        {/* -- 1. Hero Image Area ----------------------------- */}
+        <View style={styles.heroContainer}>
           <View style={styles.imagePlaceholder}>
             <Text style={styles.imageInitial}>{venueInitial}</Text>
           </View>
 
-          {/* Carousel dots */}
-          <View style={styles.carouselDots}>
-            {allImages.map((_, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.carouselDot,
-                  {
-                    backgroundColor:
-                      idx === activeImageIndex
-                        ? theme.colors.chalk
-                        : 'rgba(255,255,255,0.4)',
-                  },
-                ]}
-              />
-            ))}
+          {/* Gradient overlay */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.4)']}
+            style={styles.heroGradient}
+          />
+
+          {/* Venue name overlay on image */}
+          <View style={[styles.heroTextOverlay]}>
+            <Text style={styles.heroVenueName}>{venue.name}</Text>
+            <Text style={styles.heroNeighborhood}>
+              {venue.neighborhood}, {venue.city}
+            </Text>
           </View>
 
-          {/* Back button */}
+          {/* Back button - frosted glass */}
           <Pressable
-            style={[styles.overlayButton, styles.backButton, { top: insets.top + 12 }]}
+            style={[
+              styles.frostedButton,
+              styles.backButton,
+              { top: insets.top + 12 },
+            ]}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.overlayButtonText}>{'←'}</Text>
+            <Text style={styles.frostedButtonText}>{'←'}</Text>
           </Pressable>
 
-          {/* Save button */}
+          {/* Save button - frosted glass */}
           <Pressable
-            style={[styles.overlayButton, styles.saveButton, { top: insets.top + 12 }]}
+            style={[
+              styles.frostedButton,
+              styles.saveButton,
+              { top: insets.top + 12 },
+            ]}
             onPress={() => setSaved(!saved)}
           >
-            <Text style={styles.overlayButtonText}>
+            <Text style={styles.frostedButtonText}>
               {saved ? '♥' : '♡'}
             </Text>
           </Pressable>
         </View>
 
-        {/* ── 2. Venue Header ────────────────────────── */}
+        {/* -- 2. Vibe Match Badge ---------------------------- */}
         <View style={styles.section}>
-          <Text style={styles.venueName}>{venue.name}</Text>
-          <Text style={styles.venueLocation}>
-            {venue.neighborhood}, {venue.city}
-          </Text>
-
-          <View style={styles.headerMetaRow}>
-            <Text style={styles.priceText}>{priceSymbols(venue.priceRange)}</Text>
-            <Chip label={venue.dressCode} />
-            <NoiseDots level={venue.noiseLevel} />
-          </View>
-
           <View style={styles.vibeMatchBadge}>
             <Text style={styles.vibeMatchText}>
               % {venue.vibeMatchPercent} Uyum
             </Text>
           </View>
-        </View>
 
-        <Divider />
-
-        {/* ── 3. Vibe Indicators ─────────────────────── */}
-        <View style={styles.section}>
-          <SectionTitle title="Vibe" />
-
-          <View style={styles.vibeGrid}>
-            <InfoRow label="Dress Code">
-              <Chip label={venue.dressCode} />
-            </InfoRow>
-
-            <InfoRow label="Gürültü">
-              <NoiseDots level={venue.noiseLevel} />
-            </InfoRow>
-
-            <InfoRow label="Yoğunluk">
-              <Text style={styles.infoValueText}>
-                Hafta içi: {crowdLabels[venue.crowdWeekday]} / Hafta sonu:{' '}
-                {crowdLabels[venue.crowdWeekend]}
-              </Text>
-            </InfoRow>
-
-            <InfoRow label="Fiyat">
-              <Text style={styles.infoValueText}>
-                {priceSymbols(venue.priceRange)}
-              </Text>
-            </InfoRow>
-
-            <InfoRow label="Ortam">
-              <View style={styles.chipsRow}>
-                {venue.vibe.map((v) => (
-                  <Chip key={v} label={v} />
-                ))}
+          {/* Vibe tags */}
+          <View style={styles.vibeTagsRow}>
+            {venue.vibe.map((v) => (
+              <View key={v} style={styles.vibeTag}>
+                <Text style={styles.vibeTagText}>{v}</Text>
               </View>
-            </InfoRow>
-
-            <InfoRow label="İdeal Zaman">
-              <View style={styles.chipsRow}>
-                {venue.idealTime.map((t) => (
-                  <Chip key={t} label={idealTimeLabels[t] || t} />
-                ))}
-              </View>
-            </InfoRow>
+            ))}
           </View>
         </View>
 
-        <Divider />
+        <FullBleedDivider />
 
-        {/* ── 4. Audio & Atmosphere ──────────────────── */}
+        {/* -- 3. Vibe Section (Info Grid) -------------------- */}
+        <View style={styles.section}>
+          <SectionTitle title="Vibe" />
+
+          <View style={styles.infoGrid}>
+            {gridItems.map((item, index) => {
+              const isLeftCol = index % 2 === 0;
+              const rowIndex = Math.floor(index / 2);
+              const totalRows = Math.ceil(gridItems.length / 2);
+              const isLastRow = rowIndex === totalRows - 1;
+
+              return (
+                <InfoGridCell
+                  key={item.label}
+                  label={item.label}
+                  value={item.value}
+                  showRightBorder={isLeftCol}
+                  showBottomBorder={!isLastRow}
+                />
+              );
+            })}
+          </View>
+        </View>
+
+        <FullBleedDivider />
+
+        {/* -- 4. Music & Atmosphere -------------------------- */}
         <View style={styles.section}>
           <SectionTitle title="Müzik & Atmosfer" />
 
-          <Chip label={venue.musicGenre} />
+          <View style={styles.musicGenrePill}>
+            <Text style={styles.musicGenreText}>{venue.musicGenre}</Text>
+          </View>
 
           <Text style={styles.audioProfileText}>{venue.audioProfile}</Text>
 
           {venue.playlistUrl && (
-            <Pressable style={styles.outlinedButton}>
-              <Text style={styles.outlinedButtonText}>
+            <Pressable style={styles.playlistButton}>
+              <Text style={styles.playlistButtonText}>
                 Playlist'i Aç {'→'}
               </Text>
             </Pressable>
           )}
         </View>
 
-        <Divider />
+        <FullBleedDivider />
 
-        {/* ── 5. Pratik Bilgiler ─────────────────────── */}
+        {/* -- 5. Pratik Bilgiler ----------------------------- */}
         <View style={styles.section}>
           <SectionTitle title="Pratik Bilgiler" />
 
@@ -334,38 +373,22 @@ export default function VenueDetailScreen() {
           <View style={styles.mapPlaceholder}>
             <Text style={styles.mapPlaceholderText}>Harita</Text>
           </View>
-          <Text style={styles.addressText}>{venue.address}</Text>
 
-          <View style={styles.practicalRow}>
-            <Text style={styles.practicalIcon}>{'⏰'}</Text>
-            <Text style={styles.practicalText}>{venue.hours}</Text>
-          </View>
-
-          {venue.phone && (
-            <View style={styles.practicalRow}>
-              <Text style={styles.practicalIcon}>{'☎'}</Text>
-              <Text style={styles.practicalText}>{venue.phone}</Text>
-            </View>
-          )}
-
-          {venue.website && (
-            <View style={styles.practicalRow}>
-              <Text style={styles.practicalIcon}>{'\u{1F310}'}</Text>
-              <Text style={styles.practicalText}>{venue.website}</Text>
-            </View>
-          )}
-
-          <View style={styles.practicalRow}>
-            <Text style={styles.practicalIcon}>{'\u{1F6AA}'}</Text>
-            <Text style={styles.practicalText}>
-              Giriş: {entryDifficultyLabels[venue.entryDifficulty]}
-            </Text>
+          <View style={styles.practicalList}>
+            {practicalRows.map((row, idx) => (
+              <PracticalInfoRow
+                key={idx}
+                icon={row.icon}
+                text={row.text}
+                isLast={idx === practicalRows.length - 1}
+              />
+            ))}
           </View>
         </View>
 
-        <Divider />
+        <FullBleedDivider />
 
-        {/* ── 6. Community ───────────────────────────── */}
+        {/* -- 6. Community ----------------------------------- */}
         <View style={styles.section}>
           <SectionTitle title="Topluluk" />
 
@@ -375,41 +398,45 @@ export default function VenueDetailScreen() {
             </Text>
           </View>
 
-          <View style={styles.chipsRow}>
+          <View style={styles.communityTagsRow}>
             {venue.tags.map((tag) => (
-              <Chip key={tag} label={tag} />
+              <View key={tag} style={styles.communityTag}>
+                <Text style={styles.communityTagText}>{tag}</Text>
+              </View>
             ))}
           </View>
 
-          <View style={styles.commentsList}>
-            {venue.comments.map((comment) => (
-              <CommentCard key={comment.id} comment={comment} />
-            ))}
-          </View>
+          {venue.comments.length > 0 && (
+            <View style={styles.commentsList}>
+              {venue.comments.map((comment) => (
+                <CommentCard key={comment.id} comment={comment} />
+              ))}
+            </View>
+          )}
 
-          <Pressable style={styles.outlinedButton}>
-            <Text style={styles.outlinedButtonText}>Yorum Ekle</Text>
+          <Pressable style={styles.addCommentButton}>
+            <Text style={styles.addCommentButtonText}>Yorum Ekle</Text>
           </Pressable>
         </View>
       </ScrollView>
 
-      {/* ── 7. Action Buttons (sticky bottom) ────── */}
+      {/* -- 7. Bottom Action Bar (sticky) ------------------- */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
-        <Pressable style={styles.filledButton}>
-          <Text style={styles.filledButtonText}>Listeye Ekle</Text>
+        <Pressable style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Listeye Ekle</Text>
         </Pressable>
-        <Pressable style={styles.actionOutlinedButton}>
-          <Text style={styles.actionOutlinedButtonText}>Paylaş</Text>
+        <Pressable style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>Paylaş</Text>
         </Pressable>
-        <Pressable style={styles.actionOutlinedButton}>
-          <Text style={styles.actionOutlinedButtonText}>Benzer Mekanlar</Text>
+        <Pressable style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>Benzer</Text>
         </Pressable>
       </View>
     </View>
   );
 }
 
-/* ── Styles ───────────────────────────────────────── */
+/* -- Styles ---------------------------------------------- */
 
 const styles = StyleSheet.create({
   root: {
@@ -428,16 +455,15 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.chalk,
   },
   emptyText: {
-    fontSize: theme.typography.sizes.md,
+    fontSize: 14,
     color: theme.colors.concrete,
     fontWeight: theme.typography.weights.medium,
   },
 
-  /* 1. Image area */
-  imageContainer: {
+  /* 1. Hero image area */
+  heroContainer: {
     width: SCREEN_WIDTH,
     height: IMAGE_HEIGHT,
-    backgroundColor: theme.colors.mist,
     position: 'relative',
   },
   imagePlaceholder: {
@@ -447,37 +473,47 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.hairline,
   },
   imageInitial: {
-    fontSize: theme.typography.sizes.display,
+    fontSize: 64,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.ash,
   },
-  carouselDots: {
+  heroGradient: {
     position: 'absolute',
-    bottom: 16,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
+    bottom: 0,
+    height: IMAGE_HEIGHT * 0.5,
   },
-  carouselDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  overlayButton: {
+  heroTextOverlay: {
     position: 'absolute',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.colors.chalk,
+    bottom: 20,
+    left: 24,
+    right: 24,
+  },
+  heroVenueName: {
+    fontSize: 24,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.chalk,
+    marginBottom: 4,
+  },
+  heroNeighborhood: {
+    fontSize: 14,
+    color: theme.colors.chalk,
+    opacity: 0.9,
+  },
+
+  /* Frosted glass buttons */
+  frostedButton: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.9)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
   },
-  overlayButtonText: {
-    fontSize: theme.typography.sizes.lg,
+  frostedButtonText: {
+    fontSize: 18,
     color: theme.colors.graphite,
   },
   backButton: {
@@ -487,225 +523,262 @@ const styles = StyleSheet.create({
     right: 16,
   },
 
-  /* 2. Venue header */
+  /* Section */
   section: {
-    paddingHorizontal: theme.spacing['4'],
-    paddingVertical: theme.spacing['4'],
+    paddingHorizontal: 24,
+    paddingVertical: 24,
     backgroundColor: theme.colors.chalk,
   },
-  venueName: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.graphite,
-    marginBottom: theme.spacing['1'],
+
+  /* Full bleed divider */
+  fullBleedDivider: {
+    height: 1,
+    backgroundColor: theme.colors.hairline,
   },
-  venueLocation: {
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.concrete,
-    marginBottom: theme.spacing['3'],
-  },
-  headerMetaRow: {
+
+  /* Section title with accent bar */
+  sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing['3'],
-    marginBottom: theme.spacing['3'],
+    marginBottom: 20,
   },
-  priceText: {
-    fontSize: theme.typography.sizes.base,
+  sectionTitleAccent: {
+    width: 2,
+    height: 16,
+    backgroundColor: theme.colors.graphite,
+    marginRight: 10,
+  },
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
+    letterSpacing: -0.3,
   },
+
+  /* Vibe match badge */
   vibeMatchBadge: {
     alignSelf: 'flex-start',
     backgroundColor: theme.colors.graphite,
-    paddingHorizontal: theme.spacing['3'],
-    paddingVertical: theme.spacing['1.5'],
-    borderRadius: theme.radius.badges,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 9999,
+    marginBottom: 16,
   },
   vibeMatchText: {
-    fontSize: theme.typography.sizes.sm,
+    fontSize: 14,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.chalk,
   },
 
-  /* Divider */
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.hairline,
-    marginHorizontal: theme.spacing['4'],
-  },
-
-  /* Section title */
-  sectionTitle: {
-    fontSize: theme.typography.sizes.md,
-    fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.graphite,
-    marginBottom: theme.spacing['4'],
-  },
-
-  /* 3. Vibe indicators */
-  vibeGrid: {
-    gap: theme.spacing['4'],
-  },
-  infoRow: {
+  /* Vibe tags */
+  vibeTagsRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  infoLabel: {
-    width: 100,
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.concrete,
-    fontWeight: theme.typography.weights.medium,
-    paddingTop: 2,
-  },
-  infoValue: {
-    flex: 1,
-  },
-  infoValueText: {
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.graphite,
-    fontWeight: theme.typography.weights.regular,
-  },
-
-  /* Chips */
-  chip: {
-    paddingHorizontal: theme.spacing['3'],
-    paddingVertical: theme.spacing['1'],
-    borderRadius: theme.radius.pills,
+  vibeTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9999,
     borderWidth: 1,
     borderColor: theme.colors.hairline,
     backgroundColor: theme.colors.chalk,
-    alignSelf: 'flex-start',
   },
-  chipText: {
-    fontSize: theme.typography.sizes.xs,
+  vibeTagText: {
+    fontSize: 12,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.graphite,
   },
-  chipsRow: {
+
+  /* Info grid (Swiss grid) */
+  infoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: theme.spacing['2'],
   },
-
-  /* Noise dots */
-  dotsRow: {
+  gridCell: {
+    width: '50%',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+  },
+  gridCellRightBorder: {
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: theme.colors.hairline,
+  },
+  gridCellBottomBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.hairline,
+  },
+  gridCellLabel: {
+    fontSize: 11,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.ash,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  gridCellValue: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.regular,
+    color: theme.colors.graphite,
+  },
+  gridCellValueContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingTop: 4,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
   },
 
-  /* 4. Audio */
-  audioProfileText: {
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.concrete,
-    marginTop: theme.spacing['2'],
-    marginBottom: theme.spacing['3'],
+  /* Noise bars (equalizer) */
+  noiseBarsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+    height: 20,
+  },
+  noiseBar: {
+    width: 3,
+    borderRadius: 1.5,
   },
 
-  /* Outlined button */
-  outlinedButton: {
+  /* Dot rating */
+  dotRatingRow: {
+    flexDirection: 'row',
+    gap: 3,
+  },
+  dotRatingChar: {
+    fontSize: 10,
+  },
+
+  /* Music section */
+  musicGenrePill: {
     alignSelf: 'flex-start',
-    paddingHorizontal: theme.spacing['4'],
-    paddingVertical: theme.spacing['2.5'],
-    borderRadius: theme.radius.lg,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9999,
+    borderWidth: 1,
+    borderColor: theme.colors.hairline,
+    marginBottom: 12,
+  },
+  musicGenreText: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.graphite,
+  },
+  audioProfileText: {
+    fontSize: 14,
+    color: theme.colors.concrete,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  playlistButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: theme.colors.graphite,
-    marginTop: theme.spacing['2'],
   },
-  outlinedButtonText: {
-    fontSize: theme.typography.sizes.sm,
+  playlistButtonText: {
+    fontSize: 14,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
   },
 
-  /* 5. Practical info */
+  /* Practical info */
   mapPlaceholder: {
     height: 120,
-    borderRadius: theme.radius.lg,
+    borderRadius: 10,
     backgroundColor: theme.colors.mist,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: theme.spacing['3'],
+    marginBottom: 20,
   },
   mapPlaceholderText: {
-    fontSize: theme.typography.sizes.sm,
+    fontSize: 12,
     color: theme.colors.ash,
     fontWeight: theme.typography.weights.medium,
   },
-  addressText: {
-    fontSize: theme.typography.sizes.base,
-    color: theme.colors.graphite,
-    marginBottom: theme.spacing['4'],
-  },
+  practicalList: {},
   practicalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing['2'],
-    marginBottom: theme.spacing['3'],
+    paddingVertical: 14,
+  },
+  practicalRowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.hairline,
   },
   practicalIcon: {
-    fontSize: theme.typography.sizes.md,
-    width: 24,
-    textAlign: 'center',
+    fontSize: 16,
+    width: 28,
+    textAlign: 'left',
+    color: theme.colors.graphite,
+    fontFamily: undefined, // system default for monospace-like chars
   },
   practicalText: {
-    fontSize: theme.typography.sizes.base,
+    flex: 1,
+    fontSize: 14,
     color: theme.colors.graphite,
+    lineHeight: 20,
   },
 
-  /* 6. Community */
+  /* Community */
   checkInBadge: {
     alignSelf: 'flex-start',
     backgroundColor: theme.colors.mist,
-    paddingHorizontal: theme.spacing['3'],
-    paddingVertical: theme.spacing['1.5'],
-    borderRadius: theme.radius.badges,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
-    marginBottom: theme.spacing['3'],
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9999,
+    marginBottom: 16,
   },
   checkInBadgeText: {
-    fontSize: theme.typography.sizes.sm,
+    fontSize: 12,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
   },
-  commentsList: {
-    marginTop: theme.spacing['4'],
-    gap: theme.spacing['4'],
+  communityTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 20,
   },
-  commentCard: {
+  communityTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9999,
     borderWidth: 1,
     borderColor: theme.colors.hairline,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing['4'],
+  },
+  communityTagText: {
+    fontSize: 12,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.graphite,
+  },
+  commentsList: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  commentCard: {
+    backgroundColor: '#f2f2f2',
+    borderRadius: 14,
+    padding: 16,
   },
   commentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: theme.spacing['2'],
+    marginBottom: 10,
   },
   commentAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.colors.mist,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.chalk,
+    borderWidth: 2,
+    borderColor: theme.colors.chalk,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing['3'],
+    marginRight: 12,
   },
   commentAvatarText: {
-    fontSize: theme.typography.sizes.sm,
+    fontSize: 14,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
   },
@@ -713,66 +786,74 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   commentUserName: {
-    fontSize: theme.typography.sizes.sm,
+    fontSize: 14,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
   },
   commentDate: {
-    fontSize: theme.typography.sizes.xs,
+    fontSize: 12,
     color: theme.colors.ash,
+    marginTop: 2,
   },
   commentText: {
-    fontSize: theme.typography.sizes.base,
+    fontSize: 14,
     color: theme.colors.graphite,
     lineHeight: 20,
-    marginBottom: theme.spacing['2'],
+    marginBottom: 8,
+  },
+  addCommentButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.graphite,
+  },
+  addCommentButtonText: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.graphite,
   },
 
-  /* Stars */
-  starsRow: {
-    flexDirection: 'row',
-    gap: 2,
-  },
-  star: {
-    fontSize: theme.typography.sizes.sm,
-  },
-
-  /* 7. Bottom action bar */
+  /* Bottom action bar */
   bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     flexDirection: 'row',
-    gap: theme.spacing['2'],
-    paddingHorizontal: theme.spacing['4'],
-    paddingTop: theme.spacing['3'],
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingTop: 12,
     backgroundColor: theme.colors.chalk,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.hairline,
   },
-  filledButton: {
-    flex: 1,
+  primaryButton: {
+    flex: 2,
     backgroundColor: theme.colors.graphite,
-    paddingVertical: theme.spacing['3'],
-    borderRadius: theme.radius.lg,
+    paddingVertical: 14,
+    borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  filledButtonText: {
-    fontSize: theme.typography.sizes.sm,
+  primaryButtonText: {
+    fontSize: 14,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.chalk,
   },
-  actionOutlinedButton: {
+  secondaryButton: {
     flex: 1,
     borderWidth: 1,
     borderColor: theme.colors.graphite,
-    paddingVertical: theme.spacing['3'],
-    borderRadius: theme.radius.lg,
+    paddingVertical: 14,
+    borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
-  actionOutlinedButtonText: {
-    fontSize: theme.typography.sizes.sm,
+  secondaryButtonText: {
+    fontSize: 14,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
   },

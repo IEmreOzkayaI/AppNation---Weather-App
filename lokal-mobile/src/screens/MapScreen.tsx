@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,19 +9,23 @@ import {
   Dimensions,
   Animated,
   Alert,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
+import Svg, { Circle, Line, Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { theme } from '../theme';
 import { MOCK_VENUES } from '../data/mockData';
 import { Venue } from '../types';
 
-/* ── Constants ───────────────────────────────────────── */
+/* -- Constants -------------------------------------------------- */
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const BOTTOM_SHEET_HEIGHT = 240;
-const MAP_GRID_SPACING = 48;
-const PIN_SIZE = 36;
+const BOTTOM_SHEET_HEIGHT = 260;
+const MAP_GRID_SPACING = 52;
+const PIN_SIZE = 42;
+const PIN_SIZE_SELECTED = 52;
+const LOCATION_DOT_SIZE = 14;
+const LOCATION_RING_SIZE = 28;
 
 const FILTER_CHIPS = [
   { label: 'Tumu', key: 'all' },
@@ -32,20 +36,30 @@ const FILTER_CHIPS = [
   { label: 'Brunch', key: 'brunch' },
 ];
 
-/* ── Pin positions (simulated scatter) ───────────────── */
+/* -- Pin positions (natural scatter across map) ----------------- */
 
 const PIN_POSITIONS: { venueIndex: number; top: number; left: number }[] = [
-  { venueIndex: 0, top: 0.18, left: 0.15 },
-  { venueIndex: 1, top: 0.32, left: 0.62 },
-  { venueIndex: 2, top: 0.12, left: 0.72 },
-  { venueIndex: 3, top: 0.48, left: 0.28 },
-  { venueIndex: 4, top: 0.55, left: 0.75 },
-  { venueIndex: 5, top: 0.38, left: 0.42 },
-  { venueIndex: 6, top: 0.65, left: 0.18 },
-  { venueIndex: 7, top: 0.25, left: 0.38 },
+  { venueIndex: 0, top: 0.14, left: 0.18 },
+  { venueIndex: 1, top: 0.30, left: 0.68 },
+  { venueIndex: 2, top: 0.10, left: 0.78 },
+  { venueIndex: 3, top: 0.50, left: 0.24 },
+  { venueIndex: 4, top: 0.58, left: 0.72 },
+  { venueIndex: 5, top: 0.36, left: 0.44 },
+  { venueIndex: 6, top: 0.68, left: 0.15 },
+  { venueIndex: 7, top: 0.22, left: 0.36 },
 ];
 
-/* ── Helpers ─────────────────────────────────────────── */
+/* -- Map labels ------------------------------------------------- */
+
+const MAP_LABELS: { text: string; top: string; left: string }[] = [
+  { text: 'ISTIKLAL', top: '18%', left: '6%' },
+  { text: 'BOGAZICI', top: '46%', left: '48%' },
+  { text: 'GALATA KPR.', top: '74%', left: '8%' },
+  { text: 'CIHANGIR', top: '28%', left: '58%' },
+  { text: 'KARAKOY', top: '62%', left: '52%' },
+];
+
+/* -- Helpers ---------------------------------------------------- */
 
 function getInitials(name: string): string {
   const words = name.split(' ');
@@ -57,76 +71,35 @@ function priceLabel(range: number): string {
   return '₺'.repeat(range);
 }
 
-/* ── Search Icon (SVG) ───────────────────────────────── */
+/* -- Pulsing Location Dot --------------------------------------- */
 
-function SearchIcon() {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-      <Circle
-        cx={11}
-        cy={11}
-        r={7}
-        stroke={theme.colors.ash}
-        strokeWidth={1.8}
-      />
-      <Line
-        x1={16.5}
-        y1={16.5}
-        x2={21}
-        y2={21}
-        stroke={theme.colors.ash}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-}
-
-/* ── Crosshair / Location Icon (SVG) ────────────────── */
-
-function LocationIcon() {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={12} r={3} stroke={theme.colors.graphite} strokeWidth={1.8} />
-      <Path
-        d="M12 2v4M12 18v4M2 12h4M18 12h4"
-        stroke={theme.colors.graphite}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-}
-
-/* ── Pulse Animation Component ───────────────────────── */
-
-function PulsingDot() {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const opacityAnim = useRef(new Animated.Value(0.4)).current;
+function PulsingLocationDot() {
+  const pulseScale = useRef(new Animated.Value(1)).current;
+  const pulseOpacity = useRef(new Animated.Value(0.35)).current;
 
   useEffect(() => {
     const animation = Animated.loop(
       Animated.parallel([
         Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 2.4,
-            duration: 1500,
+          Animated.timing(pulseScale, {
+            toValue: 2.2,
+            duration: 1800,
             useNativeDriver: true,
           }),
-          Animated.timing(pulseAnim, {
+          Animated.timing(pulseScale, {
             toValue: 1,
             duration: 0,
             useNativeDriver: true,
           }),
         ]),
         Animated.sequence([
-          Animated.timing(opacityAnim, {
+          Animated.timing(pulseOpacity, {
             toValue: 0,
-            duration: 1500,
+            duration: 1800,
             useNativeDriver: true,
           }),
-          Animated.timing(opacityAnim, {
-            toValue: 0.4,
+          Animated.timing(pulseOpacity, {
+            toValue: 0.35,
             duration: 0,
             useNativeDriver: true,
           }),
@@ -135,160 +108,341 @@ function PulsingDot() {
     );
     animation.start();
     return () => animation.stop();
-  }, [pulseAnim, opacityAnim]);
+  }, [pulseScale, pulseOpacity]);
 
   return (
-    <View style={styles.pulseContainer}>
+    <View style={styles.locationPulseContainer}>
       <Animated.View
         style={[
-          styles.pulseRing,
+          styles.locationPulseRing,
           {
-            transform: [{ scale: pulseAnim }],
-            opacity: opacityAnim,
+            transform: [{ scale: pulseScale }],
+            opacity: pulseOpacity,
           },
         ]}
       />
-      <View style={styles.locationDot} />
+      <View style={styles.locationDotOuter}>
+        <View style={styles.locationDotInner} />
+      </View>
     </View>
   );
 }
 
-/* ── Map Grid Lines ──────────────────────────────────── */
+/* -- Nearest-venue pulse ring (web only) ------------------------ */
 
-function MapGrid({ width, height }: { width: number; height: number }) {
-  const verticalLines = Math.floor(width / MAP_GRID_SPACING);
-  const horizontalLines = Math.floor(height / MAP_GRID_SPACING);
+function NearestPulseRing() {
+  const ringScale = useRef(new Animated.Value(1)).current;
+  const ringOpacity = useRef(new Animated.Value(0.25)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(ringScale, {
+            toValue: 1.8,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(ringScale, {
+            toValue: 1,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(ringOpacity, {
+            toValue: 0,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(ringOpacity, {
+            toValue: 0.25,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [ringScale, ringOpacity]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.nearestPulseRing,
+        {
+          transform: [{ scale: ringScale }],
+          opacity: ringOpacity,
+        },
+      ]}
+    />
+  );
+}
+
+/* -- Premium Map Grid ------------------------------------------- */
+
+function PremiumMapGrid({ width, height }: { width: number; height: number }) {
+  const verticalCount = Math.floor(width / MAP_GRID_SPACING);
+  const horizontalCount = Math.floor(height / MAP_GRID_SPACING);
 
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
-      {/* Vertical lines */}
-      {Array.from({ length: verticalLines + 1 }).map((_, i) => (
+      <Defs>
+        <LinearGradient id="diag1" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#e8e8e8" stopOpacity="0.3" />
+          <Stop offset="0.5" stopColor="#e8e8e8" stopOpacity="0.15" />
+          <Stop offset="1" stopColor="#e8e8e8" stopOpacity="0" />
+        </LinearGradient>
+        <LinearGradient id="diag2" x1="1" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#e8e8e8" stopOpacity="0" />
+          <Stop offset="0.5" stopColor="#e8e8e8" stopOpacity="0.15" />
+          <Stop offset="1" stopColor="#e8e8e8" stopOpacity="0.3" />
+        </LinearGradient>
+      </Defs>
+
+      {/* Subtle grid lines */}
+      {Array.from({ length: verticalCount + 1 }).map((_, i) => (
         <Line
           key={`v-${i}`}
           x1={i * MAP_GRID_SPACING}
           y1={0}
           x2={i * MAP_GRID_SPACING}
           y2={height}
-          stroke={theme.colors.hairline}
-          strokeWidth={1}
+          stroke="#f0f0f0"
+          strokeWidth={0.5}
         />
       ))}
-      {/* Horizontal lines */}
-      {Array.from({ length: horizontalLines + 1 }).map((_, i) => (
+      {Array.from({ length: horizontalCount + 1 }).map((_, i) => (
         <Line
           key={`h-${i}`}
           x1={0}
           y1={i * MAP_GRID_SPACING}
           x2={width}
           y2={i * MAP_GRID_SPACING}
-          stroke={theme.colors.hairline}
-          strokeWidth={1}
+          stroke="#f0f0f0"
+          strokeWidth={0.5}
         />
       ))}
-      {/* Diagonal accent lines for depth */}
+
+      {/* Street-like diagonal lines */}
       <Line
         x1={0}
-        y1={height * 0.3}
-        x2={width * 0.4}
+        y1={height * 0.25}
+        x2={width * 0.55}
         y2={0}
-        stroke={theme.colors.hairline}
-        strokeWidth={0.5}
-        opacity={0.6}
+        stroke="url(#diag1)"
+        strokeWidth={1.5}
       />
       <Line
-        x1={width * 0.5}
+        x1={width * 0.3}
         y1={height}
         x2={width}
-        y2={height * 0.4}
-        stroke={theme.colors.hairline}
-        strokeWidth={0.5}
+        y2={height * 0.35}
+        stroke="url(#diag2)"
+        strokeWidth={1.5}
+      />
+      <Line
+        x1={0}
+        y1={height * 0.6}
+        x2={width * 0.35}
+        y2={height * 0.38}
+        stroke="#ececec"
+        strokeWidth={0.8}
+        opacity={0.5}
+      />
+      <Line
+        x1={width * 0.55}
+        y1={height * 0.2}
+        x2={width}
+        y2={height * 0.55}
+        stroke="#ececec"
+        strokeWidth={0.8}
+        opacity={0.5}
+      />
+      <Line
+        x1={width * 0.15}
+        y1={height}
+        x2={width * 0.65}
+        y2={height * 0.55}
+        stroke="#ececec"
+        strokeWidth={0.6}
+        opacity={0.35}
+      />
+
+      {/* Subtle water/park area block */}
+      <Rect
+        x={width * 0.7}
+        y={height * 0.75}
+        width={width * 0.25}
+        height={height * 0.2}
+        rx={4}
+        fill="#f4f7fa"
         opacity={0.6}
+      />
+      <Rect
+        x={width * 0.02}
+        y={height * 0.82}
+        width={width * 0.18}
+        height={height * 0.12}
+        rx={4}
+        fill="#f4f7fa"
+        opacity={0.4}
       />
     </Svg>
   );
 }
 
-/* ── Venue Pin ───────────────────────────────────────── */
+/* -- Venue Pin -------------------------------------------------- */
 
 function VenuePin({
   venue,
   top,
   left,
+  isSelected,
+  isNearest,
   onPress,
 }: {
   venue: Venue;
   top: number;
   left: number;
+  isSelected: boolean;
+  isNearest: boolean;
   onPress: () => void;
 }) {
+  const size = isSelected ? PIN_SIZE_SELECTED : PIN_SIZE;
+  const shadowSize = size + 4;
+
   return (
     <TouchableOpacity
       style={[
-        styles.pin,
+        styles.pinTouchable,
         {
           top,
           left,
+          marginLeft: -(size / 2),
+          marginTop: -(size / 2),
+          width: size + 8,
+          height: size + 8,
         },
       ]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
-      <Text style={styles.pinText}>{getInitials(venue.name)}</Text>
+      {/* Web-only pulse ring for nearest venue */}
+      {isNearest && Platform.OS === 'web' && (
+        <View style={[styles.nearestPulseWrapper, { width: size + 20, height: size + 20 }]}>
+          <NearestPulseRing />
+        </View>
+      )}
+      {/* Shadow circle behind */}
+      <View
+        style={[
+          styles.pinShadow,
+          {
+            width: shadowSize,
+            height: shadowSize,
+            borderRadius: shadowSize / 2,
+          },
+        ]}
+      />
+      {/* Main pin circle */}
+      <View
+        style={[
+          styles.pinCircle,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+          },
+        ]}
+      >
+        <Text style={[styles.pinInitials, isSelected && styles.pinInitialsSelected]}>
+          {getInitials(venue.name)}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }
 
-/* ── Venue Card (Bottom Sheet) ───────────────────────── */
+/* -- Venue Card (Bottom Sheet) ---------------------------------- */
 
 function VenueCard({ venue, onPress }: { venue: Venue; onPress: () => void }) {
+  const vibeChips = venue.vibe.slice(0, 2);
   return (
     <TouchableOpacity
       style={styles.venueCard}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
-      {/* Image placeholder */}
-      <View style={styles.cardImagePlaceholder}>
-        <Text style={styles.cardImageInitial}>{getInitials(venue.name)}</Text>
+      {/* Cover placeholder with diagonal gradient */}
+      <View style={styles.cardCover}>
+        <Svg width={180} height={100} style={StyleSheet.absoluteFill}>
+          <Defs>
+            <LinearGradient id={`cover-${venue.id}`} x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor="#e2e2e2" stopOpacity="1" />
+              <Stop offset="0.5" stopColor="#ebebeb" stopOpacity="1" />
+              <Stop offset="1" stopColor="#f5f5f5" stopOpacity="1" />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="180" height="100" fill={`url(#cover-${venue.id})`} />
+          {/* Subtle diagonal lines on cover */}
+          <Line x1="0" y1="100" x2="180" y2="0" stroke="#d8d8d8" strokeWidth={0.5} opacity={0.5} />
+          <Line x1="0" y1="60" x2="120" y2="0" stroke="#d8d8d8" strokeWidth={0.3} opacity={0.4} />
+          <Line x1="60" y1="100" x2="180" y2="40" stroke="#d8d8d8" strokeWidth={0.3} opacity={0.4} />
+        </Svg>
+        <Text style={styles.cardCoverInitial}>{getInitials(venue.name)}</Text>
       </View>
-      {/* Info */}
-      <View style={styles.cardInfo}>
+
+      {/* Info section */}
+      <View style={styles.cardBody}>
         <Text style={styles.cardName} numberOfLines={1}>
           {venue.name}
         </Text>
         <Text style={styles.cardNeighborhood} numberOfLines={1}>
           {venue.neighborhood}
         </Text>
-        <View style={styles.cardMeta}>
+        {/* Price + match on same line */}
+        <View style={styles.cardMetaRow}>
           <Text style={styles.cardPrice}>{priceLabel(venue.priceRange)}</Text>
-          <View style={styles.cardDot} />
-          <Text style={styles.cardVibe}>%{venue.vibeMatchPercent}</Text>
+          <Text style={styles.cardMetaDot}>{'·'}</Text>
+          <Text style={styles.cardMatch}>%{venue.vibeMatchPercent}</Text>
+        </View>
+        {/* Vibe chips */}
+        <View style={styles.cardVibeRow}>
+          {vibeChips.map((v) => (
+            <View key={v} style={styles.cardVibeChip}>
+              <Text style={styles.cardVibeChipText}>{v}</Text>
+            </View>
+          ))}
         </View>
       </View>
     </TouchableOpacity>
   );
 }
 
-/* ── Main Screen ─────────────────────────────────────── */
+/* -- Main Screen ------------------------------------------------ */
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const [activeFilter, setActiveFilter] = React.useState('all');
-  const [searchText, setSearchText] = React.useState('');
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [searchText, setSearchText] = useState('');
+  const [selectedPinIndex, setSelectedPinIndex] = useState<number | null>(null);
+
+  // Nearest venue is index 5 (center-ish pin, closest to current location dot)
+  const nearestVenueIndex = 5;
 
   const mapHeight =
     SCREEN_HEIGHT -
     insets.top -
-    // search bar area + chips
-    100 -
-    // bottom sheet
+    108 - // search bar + chips area
     BOTTOM_SHEET_HEIGHT -
-    // tab bar approx
-    56;
+    56; // tab bar approx
 
-  const mapWidth = SCREEN_WIDTH - theme.spacing['4'] * 2;
+  const mapWidth = SCREEN_WIDTH;
 
-  const handleVenuePress = (venue: Venue) => {
+  const handleVenuePress = (venue: Venue, pinIndex: number) => {
+    setSelectedPinIndex(pinIndex);
     Alert.alert(venue.name, `${venue.neighborhood} • ${venue.address}`, [
       { text: 'Kapat', style: 'cancel' },
     ]);
@@ -296,138 +450,127 @@ export default function MapScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* ── Top Section ──────────────────────────────── */}
-      <View style={styles.topSection}>
-        {/* Search bar */}
-        <View style={styles.searchRow}>
-          <View style={styles.searchBar}>
-            <SearchIcon />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Haritada ara..."
-              placeholderTextColor={theme.colors.ash}
-              value={searchText}
-              onChangeText={setSearchText}
-              returnKeyType="search"
-            />
-          </View>
-          <TouchableOpacity style={styles.locationButton} activeOpacity={0.7}>
-            <LocationIcon />
-          </TouchableOpacity>
+      {/* -- Search bar (full-bleed) ----------------------------- */}
+      <View style={styles.searchBarContainer}>
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>{'⌕'}</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Haritada ara..."
+            placeholderTextColor={theme.colors.ash}
+            value={searchText}
+            onChangeText={setSearchText}
+            returnKeyType="search"
+          />
         </View>
-
-        {/* Filter chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsContainer}
-          style={styles.chipsScroll}
-        >
-          {FILTER_CHIPS.map((chip) => {
-            const isActive = activeFilter === chip.key;
-            return (
-              <TouchableOpacity
-                key={chip.key}
-                style={[styles.chip, isActive && styles.chipActive]}
-                onPress={() => setActiveFilter(chip.key)}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[styles.chipText, isActive && styles.chipTextActive]}
-                >
-                  {chip.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
       </View>
 
-      {/* ── Simulated Map ────────────────────────────── */}
-      <View style={styles.mapContainer}>
-        <View
-          style={[
-            styles.mapArea,
-            { height: Math.max(mapHeight, 280) },
-          ]}
-        >
-          {/* Grid */}
-          <MapGrid width={mapWidth} height={Math.max(mapHeight, 280)} />
+      {/* -- Filter chips ---------------------------------------- */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipsContent}
+        style={styles.chipsScroll}
+      >
+        {FILTER_CHIPS.map((chip) => {
+          const isActive = activeFilter === chip.key;
+          return (
+            <TouchableOpacity
+              key={chip.key}
+              style={[styles.chip, isActive && styles.chipActive]}
+              onPress={() => setActiveFilter(chip.key)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>
+                {chip.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
-          {/* Label overlays for roads */}
-          <View style={[styles.roadLabel, { top: '22%', left: '5%' }]}>
-            <Text style={styles.roadLabelText}>Istiklal Cad.</Text>
-          </View>
-          <View style={[styles.roadLabel, { top: '50%', left: '45%' }]}>
-            <Text style={styles.roadLabelText}>Bogazici</Text>
-          </View>
-          <View style={[styles.roadLabel, { top: '72%', left: '10%' }]}>
-            <Text style={styles.roadLabelText}>Galata Kpr.</Text>
-          </View>
+      {/* -- Simulated Map --------------------------------------- */}
+      <View style={[styles.mapArea, { height: Math.max(mapHeight, 280) }]}>
+        {/* Premium grid */}
+        <PremiumMapGrid width={mapWidth} height={Math.max(mapHeight, 280)} />
 
-          {/* Venue pins */}
-          {PIN_POSITIONS.map((pos) => {
-            const venue = MOCK_VENUES[pos.venueIndex];
-            if (!venue) return null;
-            return (
-              <VenuePin
-                key={venue.id}
-                venue={venue}
-                top={Math.max(mapHeight, 280) * pos.top}
-                left={mapWidth * pos.left}
-                onPress={() => handleVenuePress(venue)}
-              />
-            );
-          })}
-
-          {/* Current location pulse */}
+        {/* Map labels */}
+        {MAP_LABELS.map((label) => (
           <View
+            key={label.text}
             style={[
-              styles.currentLocationContainer,
-              {
-                top: Math.max(mapHeight, 280) * 0.44,
-                left: mapWidth * 0.50,
-              },
+              styles.mapLabel,
+              { top: label.top as any, left: label.left as any },
             ]}
           >
-            <PulsingDot />
+            <Text style={styles.mapLabelText}>{label.text}</Text>
           </View>
+        ))}
 
-          {/* Coordinate labels */}
-          <View style={styles.coordTopLeft}>
-            <Text style={styles.coordText}>41.03N</Text>
-          </View>
-          <View style={styles.coordBottomRight}>
-            <Text style={styles.coordText}>28.98E</Text>
-          </View>
+        {/* Venue pins */}
+        {PIN_POSITIONS.map((pos) => {
+          const venue = MOCK_VENUES[pos.venueIndex];
+          if (!venue) return null;
+          return (
+            <VenuePin
+              key={venue.id}
+              venue={venue}
+              top={Math.max(mapHeight, 280) * pos.top}
+              left={mapWidth * pos.left}
+              isSelected={selectedPinIndex === pos.venueIndex}
+              isNearest={pos.venueIndex === nearestVenueIndex}
+              onPress={() => handleVenuePress(venue, pos.venueIndex)}
+            />
+          );
+        })}
+
+        {/* Current location pulse dot */}
+        <View
+          style={[
+            styles.currentLocationWrapper,
+            {
+              top: Math.max(mapHeight, 280) * 0.44,
+              left: mapWidth * 0.50,
+            },
+          ]}
+        >
+          <PulsingLocationDot />
+        </View>
+
+        {/* Coordinate markers */}
+        <View style={styles.coordNorth}>
+          <Text style={styles.coordText}>41.03{'°'}N</Text>
+        </View>
+        <View style={styles.coordEast}>
+          <Text style={styles.coordText}>28.98{'°'}E</Text>
         </View>
       </View>
 
-      {/* ── Bottom Sheet ─────────────────────────────── */}
+      {/* -- Bottom Sheet ---------------------------------------- */}
       <View style={styles.bottomSheet}>
         {/* Drag handle */}
-        <View style={styles.dragHandleRow}>
+        <View style={styles.dragHandleContainer}>
           <View style={styles.dragHandle} />
         </View>
 
-        {/* Title */}
+        {/* Header */}
         <View style={styles.sheetHeader}>
           <Text style={styles.sheetTitle}>Yakindaki Mekanlar</Text>
           <Text style={styles.sheetCount}>{MOCK_VENUES.length} mekan</Text>
         </View>
 
-        {/* Horizontal venue list */}
+        {/* Horizontal venue cards */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.venueListContent}
           style={styles.venueList}
         >
-          {MOCK_VENUES.map((venue) => (
+          {MOCK_VENUES.map((venue, idx) => (
             <VenueCard
               key={venue.id}
               venue={venue}
-              onPress={() => handleVenuePress(venue)}
+              onPress={() => handleVenuePress(venue, idx)}
             />
           ))}
         </ScrollView>
@@ -436,36 +579,33 @@ export default function MapScreen() {
   );
 }
 
-/* ── Styles ──────────────────────────────────────────── */
+/* -- Styles ----------------------------------------------------- */
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.chalk,
+    backgroundColor: '#fafafa',
   },
 
-  /* ── Top Section ── */
-  topSection: {
-    paddingHorizontal: theme.spacing['4'],
+  /* -- Search bar -- */
+  searchBarContainer: {
+    paddingHorizontal: 0,
     paddingTop: theme.spacing['3'],
-    backgroundColor: theme.colors.chalk,
-  },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing['2'],
+    paddingBottom: theme.spacing['2'],
+    backgroundColor: '#fafafa',
   },
   searchBar: {
-    flex: 1,
+    height: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.chalk,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
-    borderRadius: theme.radius.lg,
-    paddingHorizontal: theme.spacing['3'],
-    height: 44,
+    backgroundColor: theme.colors.mist,
+    paddingHorizontal: theme.spacing['4'],
     gap: theme.spacing['2'],
+  },
+  searchIcon: {
+    fontSize: 20,
+    color: theme.colors.ash,
+    marginTop: -2,
   },
   searchInput: {
     flex: 1,
@@ -474,165 +614,182 @@ const styles = StyleSheet.create({
     color: theme.colors.graphite,
     paddingVertical: 0,
   },
-  locationButton: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.chalk,
-  },
 
-  /* ── Chips ── */
+  /* -- Filter chips -- */
   chipsScroll: {
-    marginTop: theme.spacing['3'],
-    marginBottom: theme.spacing['3'],
+    flexGrow: 0,
+    marginBottom: theme.spacing['2'],
   },
-  chipsContainer: {
+  chipsContent: {
+    paddingHorizontal: theme.spacing['4'],
     gap: theme.spacing['2'],
-    paddingRight: theme.spacing['4'],
   },
   chip: {
+    height: 34,
     paddingHorizontal: theme.spacing['4'],
-    paddingVertical: theme.spacing['1.5'],
     borderRadius: theme.radius.pills,
     borderWidth: 1,
-    borderColor: theme.colors.hairline,
-    backgroundColor: theme.colors.chalk,
+    borderColor: theme.colors.concrete,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chipActive: {
     backgroundColor: theme.colors.graphite,
     borderColor: theme.colors.graphite,
   },
-  chipText: {
+  chipLabel: {
     fontSize: theme.typography.sizes.sm,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.concrete,
   },
-  chipTextActive: {
+  chipLabelActive: {
     color: theme.colors.chalk,
   },
 
-  /* ── Map ── */
-  mapContainer: {
-    flex: 1,
-    paddingHorizontal: theme.spacing['4'],
-  },
+  /* -- Map area -- */
   mapArea: {
     flex: 1,
-    backgroundColor: theme.colors.mist,
-    borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
+    backgroundColor: '#fafafa',
     overflow: 'hidden',
-    position: 'relative',
+    position: 'relative' as const,
   },
 
-  /* Road labels */
-  roadLabel: {
-    position: 'absolute',
+  /* Map annotations */
+  mapLabel: {
+    position: 'absolute' as const,
   },
-  roadLabelText: {
-    fontSize: 10,
+  mapLabelText: {
+    fontSize: 9,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.ash,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    opacity: 0.6,
+    letterSpacing: 2,
+    textTransform: 'uppercase' as const,
+    opacity: 0.55,
   },
 
-  /* Coordinate labels */
-  coordTopLeft: {
-    position: 'absolute',
-    top: theme.spacing['2'],
-    left: theme.spacing['2'],
+  /* Coordinate markers */
+  coordNorth: {
+    position: 'absolute' as const,
+    top: theme.spacing['3'],
+    left: theme.spacing['3'],
   },
-  coordBottomRight: {
-    position: 'absolute',
-    bottom: theme.spacing['2'],
-    right: theme.spacing['2'],
+  coordEast: {
+    position: 'absolute' as const,
+    bottom: theme.spacing['3'],
+    right: theme.spacing['3'],
   },
   coordText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.ash,
     letterSpacing: 1,
     fontVariant: ['tabular-nums'],
-    opacity: 0.5,
+    opacity: 0.45,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 
-  /* Venue pin */
-  pin: {
-    position: 'absolute',
-    width: PIN_SIZE,
-    height: PIN_SIZE,
-    borderRadius: PIN_SIZE / 2,
-    backgroundColor: theme.colors.graphite,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -(PIN_SIZE / 2),
-    marginTop: -(PIN_SIZE / 2),
+  /* -- Venue pins -- */
+  pinTouchable: {
+    position: 'absolute' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    zIndex: 10,
   },
-  pinText: {
-    fontSize: 11,
+  pinShadow: {
+    position: 'absolute' as const,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  pinCircle: {
+    backgroundColor: theme.colors.graphite,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  pinInitials: {
+    fontSize: 14,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.chalk,
     letterSpacing: 0.3,
   },
+  pinInitialsSelected: {
+    fontSize: 16,
+  },
 
-  /* Current location pulse */
-  currentLocationContainer: {
-    position: 'absolute',
-    marginLeft: -16,
-    marginTop: -16,
+  /* Nearest-venue pulse wrapper (web) */
+  nearestPulseWrapper: {
+    position: 'absolute' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
-  pulseContainer: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pulseRing: {
-    position: 'absolute',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#4A90D9',
-  },
-  locationDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4A90D9',
+  nearestPulseRing: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 2,
-    borderColor: theme.colors.chalk,
+    borderColor: 'rgba(74,144,217,0.35)',
+    position: 'absolute' as const,
   },
 
-  /* ── Bottom Sheet ── */
+  /* -- Current location dot -- */
+  currentLocationWrapper: {
+    position: 'absolute' as const,
+    marginLeft: -(LOCATION_RING_SIZE / 2),
+    marginTop: -(LOCATION_RING_SIZE / 2),
+    zIndex: 5,
+  },
+  locationPulseContainer: {
+    width: LOCATION_RING_SIZE,
+    height: LOCATION_RING_SIZE,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  locationPulseRing: {
+    position: 'absolute' as const,
+    width: LOCATION_RING_SIZE,
+    height: LOCATION_RING_SIZE,
+    borderRadius: LOCATION_RING_SIZE / 2,
+    backgroundColor: '#4A90D9',
+  },
+  locationDotOuter: {
+    width: LOCATION_DOT_SIZE + 4,
+    height: LOCATION_DOT_SIZE + 4,
+    borderRadius: (LOCATION_DOT_SIZE + 4) / 2,
+    backgroundColor: theme.colors.chalk,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  locationDotInner: {
+    width: LOCATION_DOT_SIZE,
+    height: LOCATION_DOT_SIZE,
+    borderRadius: LOCATION_DOT_SIZE / 2,
+    backgroundColor: '#4A90D9',
+  },
+
+  /* -- Bottom Sheet -- */
   bottomSheet: {
     backgroundColor: theme.colors.chalk,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     borderTopWidth: 1,
     borderTopColor: theme.colors.hairline,
     paddingBottom: theme.spacing['2'],
   },
-  dragHandleRow: {
-    alignItems: 'center',
-    paddingTop: theme.spacing['2'],
+  dragHandleContainer: {
+    alignItems: 'center' as const,
+    paddingTop: theme.spacing['2.5'],
     paddingBottom: theme.spacing['3'],
   },
   dragHandle: {
-    width: 40,
+    width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: theme.colors.hairline,
+    backgroundColor: '#d0d0d0',
   },
   sheetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    paddingHorizontal: theme.spacing['4'],
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'baseline' as const,
+    paddingHorizontal: theme.spacing['5'],
     marginBottom: theme.spacing['3'],
   },
   sheetTitle: {
@@ -646,53 +803,54 @@ const styles = StyleSheet.create({
     color: theme.colors.ash,
   },
 
-  /* ── Venue Cards ── */
+  /* -- Venue cards -- */
   venueList: {
     flexGrow: 0,
   },
   venueListContent: {
-    paddingHorizontal: theme.spacing['4'],
+    paddingHorizontal: theme.spacing['5'],
     gap: theme.spacing['3'],
   },
   venueCard: {
-    width: 160,
+    width: 180,
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden' as const,
+    backgroundColor: theme.colors.chalk,
     borderWidth: 1,
     borderColor: theme.colors.hairline,
-    borderRadius: theme.radius.lg,
-    overflow: 'hidden',
-    backgroundColor: theme.colors.chalk,
   },
-  cardImagePlaceholder: {
-    width: 160,
-    height: 96,
-    backgroundColor: theme.colors.mist,
-    alignItems: 'center',
-    justifyContent: 'center',
+  cardCover: {
+    width: 180,
+    height: 100,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    overflow: 'hidden' as const,
   },
-  cardImageInitial: {
-    fontSize: 22,
+  cardCoverInitial: {
+    fontSize: 24,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.ash,
-    letterSpacing: 1,
+    letterSpacing: 1.5,
+    opacity: 0.5,
   },
-  cardInfo: {
+  cardBody: {
     padding: theme.spacing['3'],
     gap: 2,
   },
   cardName: {
-    fontSize: theme.typography.sizes.base,
+    fontSize: 14,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
   },
   cardNeighborhood: {
-    fontSize: theme.typography.sizes.xs,
+    fontSize: 12,
     fontWeight: theme.typography.weights.regular,
     color: theme.colors.concrete,
     marginTop: 1,
   },
-  cardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  cardMetaRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     marginTop: theme.spacing['1.5'],
     gap: theme.spacing['1.5'],
   },
@@ -701,14 +859,29 @@ const styles = StyleSheet.create({
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.graphite,
   },
-  cardDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: theme.colors.hairline,
+  cardMetaDot: {
+    fontSize: 12,
+    color: theme.colors.ash,
+    marginHorizontal: 1,
   },
-  cardVibe: {
+  cardMatch: {
     fontSize: theme.typography.sizes.xs,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.concrete,
+  },
+  cardVibeRow: {
+    flexDirection: 'row' as const,
+    gap: theme.spacing['1.5'],
+    marginTop: theme.spacing['2'],
+  },
+  cardVibeChip: {
+    paddingHorizontal: theme.spacing['2'],
+    paddingVertical: 3,
+    borderRadius: theme.radius.pills,
+    backgroundColor: theme.colors.mist,
+  },
+  cardVibeChipText: {
+    fontSize: 10,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.concrete,
   },

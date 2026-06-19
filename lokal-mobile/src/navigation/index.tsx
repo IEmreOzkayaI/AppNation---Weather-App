@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -12,8 +12,6 @@ import AddReelScreen from '../screens/AddReelScreen';
 import ListsScreen from '../screens/ListsScreen';
 import ListDetailScreen from '../screens/ListDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-
-/* ── Stack navigators ─────────────────────────────── */
 
 const ExploreStack = createNativeStackNavigator();
 function ExploreStackScreen() {
@@ -62,8 +60,6 @@ function ProfileStackScreen() {
   );
 }
 
-/* ── Bottom tabs ──────────────────────────────────── */
-
 const Tab = createBottomTabNavigator();
 
 export default function RootNavigator() {
@@ -72,9 +68,10 @@ export default function RootNavigator() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#0a0a0a',
-        tabBarInactiveTintColor: '#a1a1a1',
+        tabBarInactiveTintColor: '#b9b9b9',
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabBarLabel,
+        tabBarItemStyle: styles.tabBarItem,
       }}
     >
       <Tab.Screen
@@ -83,7 +80,7 @@ export default function RootNavigator() {
         options={{
           tabBarLabel: 'Keşfet',
           tabBarIcon: ({ color, size }) => (
-            <TabIcon name="compass" color={color} size={size} />
+            <TabIcon name="compass" color={color} size={size - 2} />
           ),
         }}
       />
@@ -93,7 +90,7 @@ export default function RootNavigator() {
         component={MapStackScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <TabIcon name="map-pin" color={color} size={size} />
+            <TabIcon name="map-pin" color={color} size={size - 2} />
           ),
         }}
       />
@@ -103,13 +100,9 @@ export default function RootNavigator() {
         component={AddStackScreen}
         options={{
           tabBarLabel: () => null,
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: () => (
             <View style={styles.addButton}>
-              <TabIcon
-                name="plus-circle"
-                color="#ffffff"
-                size={22}
-              />
+              <TabIcon name="plus" color="#ffffff" size={20} />
             </View>
           ),
         }}
@@ -120,7 +113,7 @@ export default function RootNavigator() {
         component={ListsStackScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <TabIcon name="bookmark" color={color} size={size} />
+            <TabIcon name="bookmark" color={color} size={size - 2} />
           ),
         }}
       />
@@ -130,7 +123,7 @@ export default function RootNavigator() {
         component={ProfileStackScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <TabIcon name="user" color={color} size={size} />
+            <TabIcon name="user" color={color} size={size - 2} />
           ),
         }}
       />
@@ -138,27 +131,33 @@ export default function RootNavigator() {
   );
 }
 
-/* ── Styles ───────────────────────────────────────── */
-
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#ffffff',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e5e5e5',
-    height: 56,
-    paddingBottom: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#f2f2f2',
+    height: Platform.OS === 'web' ? 60 : 52,
+    paddingBottom: Platform.OS === 'web' ? 6 : 2,
+    paddingTop: 4,
+    elevation: 0,
+    shadowOpacity: 0,
   },
   tabBarLabel: {
     fontSize: 10,
     fontWeight: '500',
+    letterSpacing: 0.2,
+    marginTop: -2,
+  },
+  tabBarItem: {
+    paddingTop: 2,
   },
   addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: '#0a0a0a',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
 });

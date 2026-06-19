@@ -33,22 +33,69 @@ interface HomeScreenProps {
   navigation: HomeScreenNavigationProp;
 }
 
-/* ── Helpers ─────────────────────────────────────────── */
+/* ── Constants ──────────────────────────────────────── */
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const COMPACT_CARD_WIDTH = 200;
-const SMALL_CARD_WIDTH = 160;
+const COMPACT_CARD_WIDTH = 220;
+const SMALL_CARD_WIDTH = 172;
+const ACCENT_BLUE = '#4A90D9';
+const MAX_PRICE = 4;
 
-function priceLabel(range: number): string {
-  return Array(range).fill('₺').join('');
+/* ── Helpers ─────────────────────────────────────────── */
+
+/** Renders price as "₺₺₺₺" — filled symbols dark, remaining light gray. */
+function PriceIndicator({ range, large }: { range: number; large?: boolean }) {
+  const symbols = Array.from({ length: MAX_PRICE }, (_, i) => i < range);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      {symbols.map((filled, i) => (
+        <Text
+          key={i}
+          style={{
+            fontSize: large ? 14 : 12,
+            fontWeight: filled
+              ? theme.typography.weights.semibold
+              : theme.typography.weights.regular,
+            color: filled ? theme.colors.graphite : theme.colors.hairline,
+            letterSpacing: 0.5,
+          }}
+        >
+          {'₺'}
+        </Text>
+      ))}
+    </View>
+  );
 }
 
-function noiseDots(level: number): string[] {
-  return Array.from({ length: 5 }, (_, i) => (i < level ? 'filled' : 'empty'));
+/** Noise level as thin horizontal bars instead of dots. */
+function NoiseIndicator({ level }: { level: number }) {
+  const bars = Array.from({ length: 5 }, (_, i) => i < level);
+  return (
+    <View style={styles.noiseBarsRow}>
+      <Text style={styles.noiseLabel}>Ses</Text>
+      {bars.map((filled, i) => (
+        <View
+          key={i}
+          style={[
+            styles.noiseBar,
+            {
+              backgroundColor: filled
+                ? theme.colors.graphite
+                : theme.colors.hairline,
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
 }
 
 /* ── Sub-components ──────────────────────────────────── */
 
+/**
+ * Diagonal gradient placeholder for venue covers.
+ * Two overlapping Views at slight angles create a subtle mist-to-white feel.
+ */
 function CoverPlaceholder({
   name,
   height,
@@ -65,6 +112,41 @@ function CoverPlaceholder({
         { height, width: width ?? '100%' },
       ]}
     >
+      {/* Diagonal layer 1 — slightly warmer mist */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: '#f0f0f0',
+            opacity: 1,
+          },
+        ]}
+      />
+      {/* Diagonal layer 2 — lighter overlay, offset to create gradient feel */}
+      <View
+        style={{
+          position: 'absolute',
+          top: -height * 0.3,
+          right: -40,
+          width: height * 1.6,
+          height: height * 1.6,
+          backgroundColor: '#fafafa',
+          opacity: 0.7,
+          transform: [{ rotate: '-35deg' }],
+        }}
+      />
+      {/* Bottom gradient overlay — gentle darkening at the base */}
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: height * 0.45,
+          backgroundColor: '#000',
+          opacity: 0.04,
+        }}
+      />
       <Text style={styles.coverInitial}>{name.charAt(0).toUpperCase()}</Text>
     </View>
   );
@@ -117,15 +199,15 @@ function SectionHeader({
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {onSeeAll && (
-        <Pressable onPress={onSeeAll} hitSlop={8}>
-          <Text style={styles.seeAllText}>{'Tümünü gör →'}</Text>
+        <Pressable onPress={onSeeAll} hitSlop={12}>
+          <Text style={styles.seeAllText}>{'Tumunu gor'}</Text>
         </Pressable>
       )}
     </View>
   );
 }
 
-/* ── Compact Card (horizontal scroll) ────────────────── */
+/* ── Compact Venue Card (horizontal scroll — Trend) ── */
 
 function CompactVenueCard({
   venue,
@@ -136,18 +218,32 @@ function CompactVenueCard({
 }) {
   return (
     <Pressable onPress={onPress} style={styles.compactCard}>
-      <CoverPlaceholder name={venue.name} height={120} width={COMPACT_CARD_WIDTH} />
+      <CoverPlaceholder
+        name={venue.name}
+        height={130}
+        width={COMPACT_CARD_WIDTH}
+      />
+
       <View style={styles.compactCardContent}>
         <Text style={styles.compactCardName} numberOfLines={1}>
           {venue.name}
         </Text>
-        <Text style={styles.compactCardNeighborhood} numberOfLines={1}>
-          {venue.neighborhood}
-        </Text>
-        <View style={styles.compactCardMeta}>
-          <Text style={styles.priceText}>{priceLabel(venue.priceRange)}</Text>
+
+        {/* Location with dot separator */}
+        <View style={styles.locationRow}>
+          <Text style={styles.compactCardNeighborhood} numberOfLines={1}>
+            {venue.neighborhood}
+          </Text>
+          <View style={styles.dotSeparator} />
+          <Text style={styles.compactCardCity} numberOfLines={1}>
+            {venue.city}
+          </Text>
         </View>
-        <View style={styles.vibeRow}>
+
+        {/* Meta row: price + vibe tags inline */}
+        <View style={styles.metaRow}>
+          <PriceIndicator range={venue.priceRange} />
+          <View style={styles.metaDivider} />
           {venue.vibe.slice(0, 2).map((v) => (
             <VibeChip key={v} label={v} small />
           ))}
@@ -157,65 +253,66 @@ function CompactVenueCard({
   );
 }
 
-/* ── Full-width Card (vertical feed) ─────────────────── */
+/* ── Featured Card ("Sana Ozel" — large, dramatic) ─── */
 
-function FullVenueCard({
+function FeaturedVenueCard({
   venue,
   onPress,
 }: {
   venue: Venue;
   onPress: () => void;
 }) {
-  const dots = noiseDots(venue.noiseLevel);
-
   return (
-    <Pressable onPress={onPress} style={styles.fullCard}>
-      <CoverPlaceholder name={venue.name} height={180} />
+    <Pressable onPress={onPress} style={styles.featuredCard}>
+      <View>
+        <CoverPlaceholder name={venue.name} height={220} />
 
-      {/* Match badge */}
-      <View style={styles.matchBadge}>
-        <Text style={styles.matchBadgeText}>
-          % {venue.vibeMatchPercent} Match
-        </Text>
+        {/* Gradient overlay at the bottom of the cover */}
+        <View style={styles.coverGradient} />
+
+        {/* Match badge — top-right corner overlay */}
+        <View style={styles.matchBadge}>
+          <Text style={styles.matchBadgeText}>
+            {venue.vibeMatchPercent}% Match
+          </Text>
+        </View>
       </View>
 
-      <View style={styles.fullCardContent}>
-        <View style={styles.fullCardTopRow}>
+      <View style={styles.featuredCardContent}>
+        <View style={styles.featuredCardTopRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.fullCardName} numberOfLines={1}>
+            <Text style={styles.featuredCardName} numberOfLines={1}>
               {venue.name}
             </Text>
-            <Text style={styles.fullCardNeighborhood} numberOfLines={1}>
-              {venue.neighborhood}
-            </Text>
+            <View style={styles.locationRow}>
+              <Text style={styles.featuredCardNeighborhood} numberOfLines={1}>
+                {venue.neighborhood}
+              </Text>
+              <View style={styles.dotSeparator} />
+              <Text style={styles.compactCardCity} numberOfLines={1}>
+                {venue.city}
+              </Text>
+            </View>
           </View>
-          <Text style={styles.priceTextLarge}>{priceLabel(venue.priceRange)}</Text>
+          <PriceIndicator range={venue.priceRange} large />
         </View>
 
-        <View style={styles.vibeRow}>
-          {venue.vibe.map((v) => (
-            <VibeChip key={v} label={v} />
-          ))}
+        {/* Vibe tags + noise — single refined row */}
+        <View style={styles.featuredMetaRow}>
+          <View style={styles.vibeRow}>
+            {venue.vibe.map((v) => (
+              <VibeChip key={v} label={v} />
+            ))}
+          </View>
         </View>
 
-        <View style={styles.noiseRow}>
-          <Text style={styles.noiseLabel}>Ses</Text>
-          {dots.map((dot, i) => (
-            <View
-              key={i}
-              style={[
-                styles.noiseDot,
-                dot === 'filled' ? styles.noiseDotFilled : styles.noiseDotEmpty,
-              ]}
-            />
-          ))}
-        </View>
+        <NoiseIndicator level={venue.noiseLevel} />
       </View>
     </Pressable>
   );
 }
 
-/* ── Small Card (horizontal scroll) ──────────────────── */
+/* ── Small Venue Card (horizontal — Yeni Eklenenler) ── */
 
 function SmallVenueCard({
   venue,
@@ -226,14 +323,22 @@ function SmallVenueCard({
 }) {
   return (
     <Pressable onPress={onPress} style={styles.smallCard}>
-      <CoverPlaceholder name={venue.name} height={100} width={SMALL_CARD_WIDTH} />
+      <CoverPlaceholder
+        name={venue.name}
+        height={110}
+        width={SMALL_CARD_WIDTH}
+      />
       <View style={styles.smallCardContent}>
         <Text style={styles.smallCardName} numberOfLines={1}>
           {venue.name}
         </Text>
-        <Text style={styles.smallCardNeighborhood} numberOfLines={1}>
-          {venue.neighborhood}
-        </Text>
+        <View style={styles.locationRow}>
+          <Text style={styles.smallCardNeighborhood} numberOfLines={1}>
+            {venue.neighborhood}
+          </Text>
+          <View style={styles.dotSeparatorSmall} />
+          <PriceIndicator range={venue.priceRange} />
+        </View>
       </View>
     </Pressable>
   );
@@ -288,7 +393,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         <View style={styles.header}>
           <View style={styles.logoRow}>
             <Text style={styles.logoText}>lokal</Text>
-            <View style={styles.lollipopIndicator} />
+            <View style={styles.logoDot} />
           </View>
 
           {/* Search Bar */}
@@ -340,10 +445,10 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         />
 
         {/* ── Sana Ozel ───────────────────────────────── */}
-        <SectionHeader title="Sana Özel" />
+        <SectionHeader title="Sana Ozel" />
         <View style={styles.verticalSection}>
           {personalVenues.map((venue) => (
-            <FullVenueCard
+            <FeaturedVenueCard
               key={venue.id}
               venue={venue}
               onPress={() => navigateToVenue(venue.id)}
@@ -369,6 +474,12 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           nestedScrollEnabled
         />
 
+        {/* ── Bottom brand watermark ─────────────────── */}
+        <View style={styles.bottomBrand}>
+          <Text style={styles.bottomBrandText}>lokal</Text>
+          <View style={styles.bottomBrandDot} />
+        </View>
+
         {/* Bottom spacing for tab bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -379,7 +490,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 /* ── Styles ──────────────────────────────────────────── */
 
 const styles = StyleSheet.create({
-  /* Layout */
+  /* ─── Layout ───────────────────────────────────────── */
   container: {
     flex: 1,
     backgroundColor: theme.colors.chalk,
@@ -391,278 +502,360 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing['4'],
   },
 
-  /* Header */
+  /* ─── Header ───────────────────────────────────────── */
   header: {
-    paddingHorizontal: theme.spacing['4'],
-    paddingTop: theme.spacing['3'],
+    paddingHorizontal: theme.spacing['5'],
+    paddingTop: theme.spacing['4'],
     paddingBottom: theme.spacing['2'],
   },
   logoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: theme.spacing['4'],
+    marginBottom: theme.spacing['5'],
   },
   logoText: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
-    letterSpacing: -0.5,
+    letterSpacing: -1,
   },
-  lollipopIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#4A90D9',
-    marginLeft: 6,
-    marginTop: -8,
+  logoDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: ACCENT_BLUE,
+    marginLeft: 4,
+    marginTop: -14,
   },
 
-  /* Search */
+  /* ─── Search ───────────────────────────────────────── */
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.chalk,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
-    borderRadius: theme.radius.lg,
-    paddingHorizontal: theme.spacing['3'],
-    height: 44,
-    marginBottom: theme.spacing['3'],
+    backgroundColor: theme.colors.mist,
+    borderRadius: theme.radius.xl,
+    paddingHorizontal: theme.spacing['4'],
+    height: 48,
+    marginBottom: theme.spacing['4'],
   },
   searchIcon: {
-    fontSize: 14,
-    marginRight: theme.spacing['2'],
+    fontSize: 15,
+    marginRight: theme.spacing['2.5'],
+    opacity: 0.5,
   },
   searchInput: {
     flex: 1,
     fontSize: theme.typography.sizes.base,
     color: theme.colors.graphite,
     padding: 0,
+    letterSpacing: -0.1,
   },
 
-  /* Filter Chips */
+  /* ─── Filter Chips ─────────────────────────────────── */
   filterRow: {
     flexDirection: 'row',
     gap: theme.spacing['2'],
     paddingBottom: theme.spacing['2'],
   },
   filterChip: {
-    backgroundColor: theme.colors.mist,
-    borderRadius: theme.radius.badges,
-    paddingHorizontal: theme.spacing['4'],
-    paddingVertical: theme.spacing['2'],
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: theme.radius.pills,
+    paddingHorizontal: theme.spacing['5'],
+    borderWidth: 1,
+    borderColor: theme.colors.hairline,
+    backgroundColor: theme.colors.chalk,
   },
   filterChipSelected: {
     backgroundColor: theme.colors.graphite,
+    borderColor: theme.colors.graphite,
   },
   filterChipText: {
-    fontSize: theme.typography.sizes.xs,
+    fontSize: 14,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.graphite,
+    letterSpacing: -0.1,
   },
   filterChipTextSelected: {
     color: theme.colors.chalk,
   },
 
-  /* Section Header */
+  /* ─── Section Header ───────────────────────────────── */
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing['4'],
-    paddingTop: theme.spacing['6'],
-    paddingBottom: theme.spacing['3'],
+    paddingHorizontal: theme.spacing['5'],
+    paddingTop: theme.spacing['10'], // 40px — generous section gap
+    paddingBottom: theme.spacing['4'],
   },
   sectionTitle: {
-    fontSize: theme.typography.sizes.lg,
+    fontSize: 20,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
+    letterSpacing: -0.5,
   },
   seeAllText: {
     fontSize: theme.typography.sizes.sm,
     fontWeight: theme.typography.weights.medium,
-    color: theme.colors.concrete,
+    color: theme.colors.ash,
+    letterSpacing: -0.2,
   },
 
-  /* Horizontal list */
+  /* ─── Horizontal List ──────────────────────────────── */
   horizontalList: {
-    paddingHorizontal: theme.spacing['4'],
-    gap: theme.spacing['3'],
+    paddingHorizontal: theme.spacing['5'],
+    gap: theme.spacing['4'], // 16px gap between cards
   },
 
-  /* Cover Placeholder */
+  /* ─── Cover Placeholder ────────────────────────────── */
   coverPlaceholder: {
-    backgroundColor: theme.colors.mist,
+    backgroundColor: '#f0f0f0',
     alignItems: 'center',
     justifyContent: 'center',
-    borderTopLeftRadius: theme.radius.xl,
-    borderTopRightRadius: theme.radius.xl,
     overflow: 'hidden',
   },
   coverInitial: {
-    fontSize: 32,
-    fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.ash,
+    fontSize: 36,
+    fontWeight: theme.typography.weights.regular,
+    color: theme.colors.smoke,
+    opacity: 0.5,
   },
 
-  /* Compact Card */
+  /* ─── Gradient overlay for featured cover ──────────── */
+  coverGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+    backgroundColor: '#000',
+    opacity: 0.06,
+  },
+
+  /* ─── Shared location row ──────────────────────────── */
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  dotSeparator: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: theme.colors.ash,
+    marginHorizontal: 6,
+  },
+  dotSeparatorSmall: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: theme.colors.ash,
+    marginHorizontal: 5,
+  },
+
+  /* ─── Meta row (price + vibes inline) ──────────────── */
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: theme.spacing['2.5'],
+    gap: 6,
+  },
+  metaDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: theme.colors.hairline,
+    marginHorizontal: 4,
+  },
+
+  /* ─── Compact Card ─────────────────────────────────── */
   compactCard: {
     width: COMPACT_CARD_WIDTH,
     borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
     backgroundColor: theme.colors.chalk,
     overflow: 'hidden',
+    // Elevation via subtle shadow instead of border
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
   },
   compactCardContent: {
-    padding: theme.spacing['3'],
+    padding: theme.spacing['5'], // 20px internal padding — cards breathe
   },
   compactCardName: {
-    fontSize: theme.typography.sizes.base,
+    fontSize: 16,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
-    marginBottom: 2,
+    letterSpacing: -0.3,
   },
   compactCardNeighborhood: {
-    fontSize: theme.typography.sizes.xs,
+    fontSize: theme.typography.sizes.sm,
     color: theme.colors.concrete,
-    marginBottom: theme.spacing['2'],
+    letterSpacing: -0.1,
   },
-  compactCardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing['2'],
-  },
-  priceText: {
-    fontSize: theme.typography.sizes.xs,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.graphite,
+  compactCardCity: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.ash,
+    letterSpacing: -0.1,
   },
 
-  /* Vibe chips */
+  /* ─── Vibe Chips ───────────────────────────────────── */
   vibeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: theme.spacing['1'],
+    gap: theme.spacing['1.5'],
   },
   vibeChip: {
     backgroundColor: theme.colors.mist,
     borderRadius: theme.radius.pills,
-    paddingHorizontal: theme.spacing['2'],
-    paddingVertical: 3,
+    paddingHorizontal: theme.spacing['2.5'],
+    paddingVertical: 4,
   },
   vibeChipSmall: {
-    paddingHorizontal: theme.spacing['1.5'],
-    paddingVertical: 2,
+    paddingHorizontal: theme.spacing['2'],
+    paddingVertical: 3,
   },
   vibeChipText: {
     fontSize: theme.typography.sizes.xs,
     color: theme.colors.concrete,
     fontWeight: theme.typography.weights.medium,
+    letterSpacing: -0.1,
   },
   vibeChipTextSmall: {
-    fontSize: 10,
+    fontSize: 11,
   },
 
-  /* Full Card */
-  fullCard: {
-    marginHorizontal: theme.spacing['4'],
-    marginBottom: theme.spacing['4'],
+  /* ─── Featured Card ("Sana Ozel") ──────────────────── */
+  featuredCard: {
+    marginHorizontal: theme.spacing['5'],
+    marginBottom: theme.spacing['5'],
     borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
     backgroundColor: theme.colors.chalk,
     overflow: 'hidden',
+    // Premium elevation
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 5,
   },
-  fullCardContent: {
-    padding: theme.spacing['4'],
+  featuredCardContent: {
+    padding: theme.spacing['5'], // 20px
   },
-  fullCardTopRow: {
+  featuredCardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: theme.spacing['3'],
+    marginBottom: theme.spacing['4'],
   },
-  fullCardName: {
-    fontSize: theme.typography.sizes.md,
+  featuredCardName: {
+    fontSize: 18,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
-    marginBottom: 2,
+    letterSpacing: -0.4,
   },
-  fullCardNeighborhood: {
+  featuredCardNeighborhood: {
     fontSize: theme.typography.sizes.sm,
     color: theme.colors.concrete,
+    letterSpacing: -0.1,
   },
-  priceTextLarge: {
-    fontSize: theme.typography.sizes.base,
-    fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.graphite,
+  featuredMetaRow: {
+    marginBottom: theme.spacing['3'],
   },
+
+  /* ─── Match Badge ──────────────────────────────────── */
   matchBadge: {
     position: 'absolute',
-    top: theme.spacing['3'],
-    right: theme.spacing['3'],
+    top: theme.spacing['4'],
+    right: theme.spacing['4'],
     backgroundColor: theme.colors.graphite,
-    borderRadius: theme.radius.pills,
-    paddingHorizontal: theme.spacing['3'],
-    paddingVertical: theme.spacing['1'],
+    borderRadius: 14,
+    paddingHorizontal: theme.spacing['4'],
+    paddingVertical: theme.spacing['1.5'],
   },
   matchBadgeText: {
     fontSize: theme.typography.sizes.xs,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.chalk,
+    letterSpacing: 0.3,
   },
 
-  /* Noise indicator */
-  noiseRow: {
+  /* ─── Noise Indicator (thin bars) ──────────────────── */
+  noiseBarsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: theme.spacing['3'],
-    gap: theme.spacing['1'],
+    gap: 2,
   },
   noiseLabel: {
     fontSize: theme.typography.sizes.xs,
     color: theme.colors.ash,
     fontWeight: theme.typography.weights.medium,
-    marginRight: theme.spacing['1'],
+    marginRight: theme.spacing['2'],
+    letterSpacing: -0.1,
   },
-  noiseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  noiseDotFilled: {
-    backgroundColor: theme.colors.graphite,
-  },
-  noiseDotEmpty: {
-    backgroundColor: theme.colors.hairline,
+  noiseBar: {
+    width: 3,
+    height: 12,
+    borderRadius: 1.5,
   },
 
-  /* Vertical section */
+  /* ─── Vertical section ─────────────────────────────── */
   verticalSection: {
     paddingTop: theme.spacing['1'],
   },
 
-  /* Small Card */
+  /* ─── Small Card ───────────────────────────────────── */
   smallCard: {
     width: SMALL_CARD_WIDTH,
     borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
     backgroundColor: theme.colors.chalk,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   smallCardContent: {
-    padding: theme.spacing['2'],
+    padding: theme.spacing['4'],
   },
   smallCardName: {
-    fontSize: theme.typography.sizes.sm,
+    fontSize: theme.typography.sizes.base,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
-    marginBottom: 1,
+    letterSpacing: -0.2,
+    marginBottom: 2,
   },
   smallCardNeighborhood: {
-    fontSize: 11,
+    fontSize: theme.typography.sizes.xs,
     color: theme.colors.concrete,
+    letterSpacing: -0.1,
+  },
+
+  /* ─── Bottom Brand Watermark ───────────────────────── */
+  bottomBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: theme.spacing['10'],
+    paddingBottom: theme.spacing['4'],
+  },
+  bottomBrandText: {
+    fontSize: 12,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.ash,
+    letterSpacing: -0.5,
+  },
+  bottomBrandDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: ACCENT_BLUE,
+    marginLeft: 2,
+    marginTop: -6,
   },
 });

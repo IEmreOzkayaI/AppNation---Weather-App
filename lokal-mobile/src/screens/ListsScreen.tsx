@@ -24,10 +24,6 @@ function getInitial(name: string): string {
   return name.charAt(0).toUpperCase();
 }
 
-function priceLabel(range: number): string {
-  return Array(range).fill('₺').join('');
-}
-
 /* ── Saved Venue Mini Card ────────────────────────── */
 
 function SavedVenueMiniCard({ venue }: { venue: Venue }) {
@@ -38,6 +34,9 @@ function SavedVenueMiniCard({ venue }: { venue: Venue }) {
       </View>
       <Text style={styles.miniCardName} numberOfLines={2}>
         {venue.name}
+      </Text>
+      <Text style={styles.miniCardNeighborhood} numberOfLines={1}>
+        {venue.neighborhood}
       </Text>
     </View>
   );
@@ -57,7 +56,7 @@ function VenueAvatarRow({ venueIds }: { venueIds: string[] }) {
             key={id}
             style={[
               styles.avatarCircle,
-              { marginLeft: index === 0 ? 0 : -10 },
+              { marginLeft: index === 0 ? 0 : -8 },
             ]}
           >
             <Text style={styles.avatarInitial}>{getInitial(venue.name)}</Text>
@@ -68,41 +67,39 @@ function VenueAvatarRow({ venueIds }: { venueIds: string[] }) {
   );
 }
 
-/* ── List Card ────────────────────────────────────── */
+/* ── List Row ─────────────────────────────────────── */
 
-function ListCard({
+function ListRow({
   list,
   onPress,
+  isLast,
 }: {
   list: VenueList;
   onPress: () => void;
+  isLast: boolean;
 }) {
   return (
     <TouchableOpacity
-      style={styles.listCard}
+      style={[styles.listRow, !isLast && styles.listRowBorder]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.6}
     >
-      <View style={styles.listCardHeader}>
-        <Text style={styles.listCardName}>{list.name}</Text>
-        <View style={styles.listCardMeta}>
-          <Text style={styles.listCardCount}>
-            {list.venueIds.length} mekan
-          </Text>
-          <View style={styles.dot} />
-          <Text style={styles.listCardVisibility}>
-            {list.isPublic ? 'Herkese acik' : 'Gizli'}
-          </Text>
-        </View>
-      </View>
-
-      {list.description ? (
-        <Text style={styles.listCardDescription} numberOfLines={2}>
-          {list.description}
-        </Text>
-      ) : null}
-
       <VenueAvatarRow venueIds={list.venueIds} />
+
+      <View style={styles.listRowContent}>
+        <Text style={styles.listRowName} numberOfLines={1}>
+          {list.name}
+        </Text>
+        <Text style={styles.listRowMeta} numberOfLines={1}>
+          {list.venueIds.length} mekan {'·'}{' '}
+          {list.isPublic ? 'Herkese acik' : 'Gizli'}
+        </Text>
+        {list.description ? (
+          <Text style={styles.listRowDescription} numberOfLines={1}>
+            {list.description}
+          </Text>
+        ) : null}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -135,10 +132,11 @@ export default function ListsScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Listelerim</Text>
         <TouchableOpacity
+          style={styles.newListPill}
           onPress={() => setModalVisible(true)}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
-          <Text style={styles.newListButton}>Yeni Liste +</Text>
+          <Text style={styles.newListPillText}>Yeni Liste +</Text>
         </TouchableOpacity>
       </View>
 
@@ -150,7 +148,7 @@ export default function ListsScreen() {
         {/* Saved Venues Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Kaydedilenler</Text>
+            <Text style={styles.sectionTitle}>KAYDEDILENLER</Text>
             <View style={styles.countBadge}>
               <Text style={styles.countBadgeText}>{savedVenues.length}</Text>
             </View>
@@ -167,19 +165,17 @@ export default function ListsScreen() {
         </View>
 
         {/* Lists Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { paddingHorizontal: theme.spacing[4] }]}>Listeler</Text>
-          <View style={styles.listsContainer}>
-            {MOCK_LISTS.map((list) => (
-              <ListCard
-                key={list.id}
-                list={list}
-                onPress={() =>
-                  navigation.navigate('ListDetail', { listId: list.id })
-                }
-              />
-            ))}
-          </View>
+        <View style={styles.listsSection}>
+          {MOCK_LISTS.map((list, index) => (
+            <ListRow
+              key={list.id}
+              list={list}
+              isLast={index === MOCK_LISTS.length - 1}
+              onPress={() =>
+                navigation.navigate('ListDetail', { listId: list.id })
+              }
+            />
+          ))}
         </View>
       </ScrollView>
 
@@ -187,7 +183,7 @@ export default function ListsScreen() {
       <Modal
         visible={modalVisible}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setModalVisible(false)}
       >
         <TouchableOpacity
@@ -200,10 +196,11 @@ export default function ListsScreen() {
             activeOpacity={1}
             onPress={() => {}}
           >
+            <View style={styles.modalHandle} />
+
             <Text style={styles.modalTitle}>Yeni Liste</Text>
 
             <View style={styles.modalField}>
-              <Text style={styles.modalLabel}>Ad</Text>
               <TextInput
                 style={styles.modalInput}
                 value={newListName}
@@ -214,7 +211,6 @@ export default function ListsScreen() {
             </View>
 
             <View style={styles.modalField}>
-              <Text style={styles.modalLabel}>Aciklama</Text>
               <TextInput
                 style={[styles.modalInput, styles.modalInputMultiline]}
                 value={newListDescription}
@@ -228,9 +224,16 @@ export default function ListsScreen() {
             </View>
 
             <View style={styles.modalToggleRow}>
-              <Text style={styles.modalLabel}>
-                {newListPublic ? 'Herkese acik' : 'Gizli'}
-              </Text>
+              <View>
+                <Text style={styles.modalToggleLabel}>
+                  {newListPublic ? 'Herkese acik' : 'Gizli'}
+                </Text>
+                <Text style={styles.modalToggleHint}>
+                  {newListPublic
+                    ? 'Herkes bu listeyi gorebilir'
+                    : 'Sadece sen gorebilirsin'}
+                </Text>
+              </View>
               <Switch
                 value={newListPublic}
                 onValueChange={setNewListPublic}
@@ -270,19 +273,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.hairline,
+    paddingTop: theme.spacing[4],
+    paddingBottom: theme.spacing[5],
   },
   headerTitle: {
-    fontSize: theme.typography.sizes.lg,
+    fontSize: 28,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
+    letterSpacing: -0.5,
   },
-  newListButton: {
-    fontSize: theme.typography.sizes.base,
+  newListPill: {
+    backgroundColor: theme.colors.graphite,
+    borderRadius: theme.radius.pills,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing['2.5'],
+  },
+  newListPillText: {
+    fontSize: theme.typography.sizes.sm,
     fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.graphite,
+    color: theme.colors.chalk,
   },
 
   /* Scroll */
@@ -295,8 +304,8 @@ const styles = StyleSheet.create({
 
   /* Section */
   section: {
-    paddingTop: theme.spacing[5],
-    gap: theme.spacing[3],
+    paddingTop: theme.spacing[2],
+    gap: theme.spacing[4],
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -305,20 +314,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing[4],
   },
   sectionTitle: {
-    fontSize: theme.typography.sizes.md,
-    fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.graphite,
+    fontSize: 11,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.ash,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   countBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: theme.colors.graphite,
-    borderRadius: theme.radius.badges,
-    paddingHorizontal: theme.spacing[2],
-    paddingVertical: 2,
-    minWidth: 24,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   countBadgeText: {
-    fontSize: theme.typography.sizes.xs,
+    fontSize: 10,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.chalk,
   },
@@ -329,13 +340,13 @@ const styles = StyleSheet.create({
     gap: theme.spacing[3],
   },
   miniCard: {
-    width: 100,
-    gap: theme.spacing[2],
+    width: 120,
+    gap: theme.spacing['1.5'],
   },
   miniCardImage: {
-    width: 100,
-    height: 100,
-    borderRadius: theme.radius.xl,
+    width: 120,
+    height: 140,
+    borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.mist,
     borderWidth: 1,
     borderColor: theme.colors.hairline,
@@ -343,63 +354,56 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   miniCardInitial: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.concrete,
+    fontSize: 28,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.ash,
   },
   miniCardName: {
-    fontSize: theme.typography.sizes.xs,
-    fontWeight: theme.typography.weights.medium,
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
-    textAlign: 'center',
+  },
+  miniCardNeighborhood: {
+    fontSize: 11,
+    fontWeight: theme.typography.weights.regular,
+    color: theme.colors.concrete,
   },
 
   /* Lists */
-  listsContainer: {
+  listsSection: {
+    marginTop: theme.spacing[8],
     paddingHorizontal: theme.spacing[4],
-    gap: theme.spacing[3],
   },
-  listCard: {
-    backgroundColor: theme.colors.chalk,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing[4],
-    gap: theme.spacing[3],
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 72,
+    paddingVertical: theme.spacing[4],
+    gap: theme.spacing[4],
   },
-  listCardHeader: {
-    gap: 4,
+  listRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.hairline,
   },
-  listCardName: {
+  listRowContent: {
+    flex: 1,
+    gap: 2,
+  },
+  listRowName: {
     fontSize: theme.typography.sizes.md,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
   },
-  listCardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing[2],
-  },
-  listCardCount: {
+  listRowMeta: {
     fontSize: theme.typography.sizes.xs,
     fontWeight: theme.typography.weights.regular,
     color: theme.colors.concrete,
   },
-  dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: theme.colors.ash,
-  },
-  listCardVisibility: {
-    fontSize: theme.typography.sizes.xs,
-    fontWeight: theme.typography.weights.regular,
-    color: theme.colors.concrete,
-  },
-  listCardDescription: {
+  listRowDescription: {
     fontSize: theme.typography.sizes.sm,
     fontWeight: theme.typography.weights.regular,
     color: theme.colors.concrete,
+    marginTop: 2,
   },
 
   /* Overlapping Avatars */
@@ -412,7 +416,7 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     backgroundColor: theme.colors.mist,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: theme.colors.chalk,
     alignItems: 'center',
     justifyContent: 'center',
@@ -426,43 +430,44 @@ const styles = StyleSheet.create({
   /* Modal */
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(10, 10, 10, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing[4],
+    backgroundColor: 'rgba(10, 10, 10, 0.4)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    width: '100%',
     backgroundColor: theme.colors.chalk,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing[6],
-    gap: theme.spacing[4],
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: theme.spacing[6],
+    paddingBottom: theme.spacing[10],
+    paddingTop: theme.spacing[3],
+    gap: theme.spacing[5],
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.hairline,
+    alignSelf: 'center',
+    marginBottom: theme.spacing[2],
   },
   modalTitle: {
-    fontSize: theme.typography.sizes.lg,
+    fontSize: 20,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.graphite,
   },
   modalField: {
     gap: theme.spacing[2],
   },
-  modalLabel: {
-    fontSize: theme.typography.sizes.sm,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.graphite,
-  },
   modalInput: {
-    backgroundColor: theme.colors.chalk,
-    borderWidth: 1,
-    borderColor: theme.colors.hairline,
+    height: 48,
+    backgroundColor: theme.colors.mist,
     borderRadius: theme.radius.lg,
     paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[3],
     fontSize: theme.typography.sizes.base,
     color: theme.colors.graphite,
   },
   modalInputMultiline: {
-    minHeight: 72,
+    height: 88,
     paddingTop: theme.spacing[3],
   },
   modalToggleRow: {
@@ -470,10 +475,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  modalToggleLabel: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.graphite,
+  },
+  modalToggleHint: {
+    fontSize: 11,
+    fontWeight: theme.typography.weights.regular,
+    color: theme.colors.ash,
+    marginTop: 2,
+  },
   modalCreateButton: {
+    height: 48,
     backgroundColor: theme.colors.graphite,
     borderRadius: theme.radius.lg,
-    paddingVertical: theme.spacing[4],
     alignItems: 'center',
     justifyContent: 'center',
   },
